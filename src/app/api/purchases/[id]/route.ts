@@ -1,0 +1,119 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { getAuthContext, isManager } from "@/lib/auth-context";
+import { prisma } from "@/lib/prisma";
+import { storeUpperOpt } from "@/lib/store-text";
+
+const patchSchema = z
+  .object({
+    supplierId: z.string().min(1).optional(),
+    invoiceRef: z.union([z.string(), z.null()]).optional(),
+    /** yyyy-mm-dd or null to clear */
+    invoiceDate: z.union([z.string(), z.null()]).optional(),
+    notes: z.union([z.string(), z.null()]).optional(),
+    /** true = finalize purchase (view only); cannot be set back to false via API */
+    complete: z.boolean().optional(),
+  })
+  .strict()
+  .refine(
+    (o) =>
+      o.supplierId !== undefined ||
+      o.invoiceRef !== undefined ||
+      o.invoiceDate !== undefined ||
+      o.notes !== undefined ||
+      o.complete !== undefined,
+    { message: "no_fields" },
+  );
+
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const ctx = await getAuthContext();
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isManager(ctx)) return NextResponse.json({ error: "Managers only" }, { status: 403 });
+
+  const { id } = await params;
+  const purchase = await prisma.purchase.findFirst({
+    where: { id, storeId: ctx.activeStoreId },
+    include: {
+      supplier: { select: { id: true, name: true } },
+      createdBy: { select: { name: true, email: true } },
+      lines: {
+        include: { product: { select: { id: true, name: true, sku: true } } },
+        orderBy: { id: "asc" },
+      },
+    },
+  });
+  if (!purchase) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({ purchase });
+}
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const ctx = await getAuthContext();
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isManager(ctx)) return NextResponse.json({ error: "Managers only" }, { status: 403 });
+
+  const { id } = await params;
+  const json = await req.json().catch(() => null);
+  const parsed = patchSchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+
+  const existing = await prisma.purchase.findFirst({
+    where: { id, storeId: ctx.activeStoreId },
+    select: { id: true, complete: true },
+  });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const d = parsed.data;
+
+  if (existing.complete) {
+    return NextResponse.json(
+      { error: "This purchase is finalized. No further changes are allowed (view only)." },
+      { status: 403 },
+    );
+  }
+
+  const supplierOk =
+    d.supplierId === undefined
+      ? true
+      : !!(await prisma.supplier.findFirst({ where: { id: d.supplierId }, select: { id: true } }));
+  if (!supplierOk) return NextResponse.json({ error: "Invalid supplier" }, { status: 400 });
+
+  const purchase = await prisma.purchase.update({
+    where: { id },
+    data: {
+      ...(d.supplierId !== undefined ? { supplierId: d.supplierId } : {}),
+      ...(d.invoiceRef !== undefined
+        ? { invoiceRef: d.invoiceRef === null ? null : storeUpperOpt(d.invoiceRef) ?? null }
+        : {}),
+      ...(d.invoiceDate !== undefined
+        ? {
+            invoiceDate:
+              d.invoiceDate === null || d.invoiceDate === ""
+                ? null
+                : new Date(`${d.invoiceDate.trim()}T12:00:00.000Z`),
+          }
+        : {}),
+      ...(d.notes !== undefined
+        ? { notes: d.notes === null ? null : storeUpperOpt(d.notes) ?? null }
+        : {}),
+      ...(d.complete !== undefined ? { complete: d.complete } : {}),
+    },
+    include: {
+      supplier: { select: { id: true, name: true } },
+      createdBy: { select: { name: true, email: true } },
+      lines: {
+        include: { product: { select: { id: true, name: true, sku: true } } },
+        orderBy: { id: "asc" },
+      },
+    },
+  });
+
+  return NextResponse.json({ purchase });
+}

@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #000000;
+  --foreground: #fafafa;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  /* REIMED brand — logo palette (navy → teal) */
+  --color-brand-blue: #0a4d8c;
+  --color-brand-blue-hover: #083d70;
+  --color-brand-blue-light: #4a9fd4;
+  --color-brand-green: #2eb8c0;
+  --color-brand-green-hover: #259aa1;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Hide native number input steppers everywhere (Chrome, Safari, Edge, Firefox) */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Compact purchase line tables on desktop */
+@media (min-width: 768px) {
+  .purchase-lines-stack td input,
+  .purchase-lines-stack td select {
+    min-width: 0;
+  }
+}
+
+/* Purchase line tables: stack rows as cards on phone */
+@media (max-width: 767px) {
+  .purchase-lines-stack {
+    min-width: 0 !important;
+  }
+  .purchase-lines-stack thead {
+    display: none;
+  }
+  .purchase-lines-stack tbody tr {
+    display: block;
+    margin-bottom: 0.75rem;
+    border: 1px solid rgb(228 228 231);
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    background: rgb(255 255 255);
+  }
+  .dark .purchase-lines-stack tbody tr {
+    border-color: rgb(63 63 70);
+    background: rgb(24 24 27 / 0.5);
+  }
+  .purchase-lines-stack tbody tr.bg-emerald-50\/50 {
+    border-color: rgb(167 243 208);
+  }
+  .purchase-lines-stack td {
+    display: block;
+    position: static !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    box-shadow: none !important;
+    padding: 0.35rem 0 !important;
+    text-align: left !important;
+  }
+  .purchase-lines-stack td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: rgb(113 113 122);
+    margin-bottom: 0.2rem;
+  }
+  .purchase-lines-stack td[data-label=""]::before {
+    display: none;
+  }
+  .purchase-lines-stack td input,
+  .purchase-lines-stack td select {
+    font-size: 1rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+}

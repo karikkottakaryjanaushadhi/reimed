@@ -1,0 +1,17 @@
+# Optional local DB (only if you are not already using host Postgres on :5432).
+# Current .env points at host: postgresql://postgres:postgres@localhost:5432/reimed
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: reimed
+      POSTGRES_PASSWORD: reimed
+      POSTGRES_DB: reimed
+    ports:
+      - "5434:5432"
+    volumes:
+      - reimed_pg:/var/lib/postgresql/data
+
+volumes:
+  reimed_pg:
