@@ -8,24 +8,11 @@ import { gstPctNumber } from "@/lib/product-gst-slabs";
 import { productCategoryLabel } from "@/lib/product-categories";
 import { productTypeLabel } from "@/lib/product-types";
 import { displayDrugCode } from "@/lib/drug-code";
+import type { ProductListRow } from "@/lib/product-list-row";
 import { ProductForm, productRowToFormValues } from "./product-form";
 import { ProductsListMobile } from "./products-list-mobile";
 
-export type ProductListRow = {
-  productId: string;
-  sku: string;
-  name: string;
-  genericName: string | null;
-  productCategory: string | null;
-  productType: string | null;
-  brandId: string | null;
-  brandName: string | null;
-  packSize: number;
-  reorderMin: number;
-  gstPct: number;
-  stockQty: number;
-  suppliers: string | null;
-};
+export type { ProductListRow };
 
 function stockCellClass(stockQty: number, reorderMin: number): string {
   if (stockQty <= 0) return "text-rose-700 dark:text-rose-300";

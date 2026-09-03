@@ -21,6 +21,7 @@ export function ProductsFilterForm({
   hiddenSort,
   hiddenDir,
   clearHref,
+  exportHref,
 }: {
   q: string;
   brand: string;
@@ -31,6 +32,7 @@ export function ProductsFilterForm({
   hiddenSort?: string;
   hiddenDir?: string;
   clearHref: string;
+  exportHref: string;
 }) {
   const formRef = useRef<HTMLFormElement | null>(null);
 
@@ -129,6 +131,12 @@ export function ProductsFilterForm({
         >
           Clear filters
         </Link>
+        <a
+          href={exportHref}
+          className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+        >
+          Download CSV
+        </a>
       </div>
     </form>
   );

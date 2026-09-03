@@ -6,16 +6,10 @@ import { ProductwiseListMobile } from "@/app/dashboard/sales/productwise/product
 import { MobileFilterSheet } from "@/components/mobile-filter-sheet";
 import { ListPageSizeControls, ListPaginationNav } from "@/components/list-pagination";
 import { getAuthContext } from "@/lib/auth-context";
-import { createdAtDatetimeRange } from "@/lib/date-range-filter";
 import { DEFAULT_LIST_PAGE_SIZE, parseListLimitParam } from "@/lib/list-pagination";
-import { aggregateStoreStock } from "@/lib/inventory-stock-aggregate";
-import {
-  aggregateProductwiseSales,
-  productwiseSaleLineWhere,
-  sumProductwiseRows,
-} from "@/lib/productwise-sales-aggregate";
+import { sumProductwiseRows } from "@/lib/productwise-sales-aggregate";
+import { loadProductwiseSalesReport } from "@/lib/productwise-sales-report";
 import { getProductwiseProductOptions } from "@/lib/sales-filter-options";
-import { prisma } from "@/lib/prisma";
 
 function buildProductwiseSearchUrl(
   basePath: string,
@@ -65,110 +59,21 @@ export default async function ProductwiseSalesPage({
   const from = fromRaw || today;
   const to = toRaw || today;
 
-  const dateFilter = createdAtDatetimeRange(from || undefined, to || undefined);
-  const saleWhere = {
-    storeId: ctx.activeStoreId,
-    ...(dateFilter ? { createdAt: dateFilter } : {}),
-  };
-  const lineWhere = productwiseSaleLineWhere(saleWhere, product || undefined);
-
-  const [initialProducts, saleLines, returnLines] = await Promise.all([
+  const [initialProducts, productTotals] = await Promise.all([
     getProductwiseProductOptions({
       storeId: ctx.activeStoreId,
       from,
       to,
     }),
-    prisma.saleLine.findMany({
-      where: lineWhere,
-      select: {
-        saleId: true,
-        qty: true,
-        amount: true,
-        discountAmount: true,
-        gstAmount: true,
-        product: {
-          select: {
-            id: true,
-            name: true,
-            packSize: true,
-          },
-        },
-        lot: {
-          select: {
-            costPrice: true,
-          },
-        },
-      },
-    }),
-    prisma.saleReturnLine.findMany({
-      where: {
-        saleLine: lineWhere,
-      },
-      select: {
-        qty: true,
-        refundTotal: true,
-        saleLine: {
-          select: {
-            saleId: true,
-            qty: true,
-            amount: true,
-            discountAmount: true,
-            gstAmount: true,
-            product: {
-              select: {
-                id: true,
-                name: true,
-                packSize: true,
-              },
-            },
-            lot: {
-              select: {
-                costPrice: true,
-              },
-            },
-          },
-        },
-      },
+    loadProductwiseSalesReport({
+      storeId: ctx.activeStoreId,
+      from,
+      to,
+      product,
+      sort,
+      dir,
     }),
   ]);
-
-  const salesRows = aggregateProductwiseSales(saleLines, returnLines);
-  const stockRows =
-    salesRows.length > 0
-      ? await aggregateStoreStock({
-          storeId: ctx.activeStoreId,
-          productIds: salesRows.map((r) => r.productId),
-        })
-      : [];
-  const balanceByProductId = new Map(
-    stockRows.map((r) => [r.productId, r.quantity + r.expiredQuantity] as const),
-  );
-  const supplierByProductId = new Map(stockRows.map((r) => [r.productId, r.supplier] as const));
-  const productTotals = salesRows
-    .map((row) => ({
-      ...row,
-      remainingQty: balanceByProductId.get(row.productId) ?? 0,
-      supplier: supplierByProductId.get(row.productId) ?? null,
-    }))
-    .sort((a, b) => {
-      if (sort === "name") {
-        const cmp = a.productName.localeCompare(b.productName);
-        return dir === "asc" ? cmp : -cmp;
-      }
-      if (sort === "quantity") {
-        return dir === "asc" ? a.quantity - b.quantity : b.quantity - a.quantity;
-      }
-      if (sort === "gross") {
-        return dir === "asc" ? a.gross - b.gross : b.gross - a.gross;
-      }
-      if (sort === "billCount") {
-        return dir === "asc" ? a.billCount - b.billCount : b.billCount - a.billCount;
-      }
-      if (sort === "returnCredits") {
-        return dir === "asc" ? a.returnCredits - b.returnCredits : b.returnCredits - a.returnCredits;
-      }
-      return 0;
-    });
 
   const totals = sumProductwiseRows(productTotals);
   const totalCount = productTotals.length;
@@ -195,6 +100,13 @@ export default async function ProductwiseSalesPage({
     ...(product ? { product } : {}),
     from: today,
     to: today,
+  });
+  const exportHref = buildProductwiseSearchUrl("/api/dashboard/sales/productwise/export", 1, DEFAULT_LIST_PAGE_SIZE, {
+    from,
+    to,
+    ...(product ? { product } : {}),
+    ...(sort !== "name" ? { sort } : {}),
+    ...(dir !== "desc" ? { dir } : {}),
   });
 
   let activeFilterCount = 0;
@@ -267,6 +179,7 @@ export default async function ProductwiseSalesPage({
           hiddenLimit={pageSize !== DEFAULT_LIST_PAGE_SIZE ? String(pageSize) : undefined}
           clearHref={clearHref}
           resetTodayHref={resetTodayHref}
+          exportHref={exportHref}
         />
       </MobileFilterSheet>
 

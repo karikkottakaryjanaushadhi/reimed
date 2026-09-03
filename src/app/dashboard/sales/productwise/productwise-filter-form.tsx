@@ -18,6 +18,7 @@ export function ProductwiseFilterForm({
   hiddenLimit,
   clearHref,
   resetTodayHref,
+  exportHref,
 }: {
   actionPath: string;
   from: string;
@@ -27,6 +28,7 @@ export function ProductwiseFilterForm({
   hiddenLimit?: string;
   clearHref: string;
   resetTodayHref: string;
+  exportHref: string;
 }) {
   const formRef = useRef<HTMLFormElement | null>(null);
   const today = formatAppDateYmd();
@@ -84,6 +86,12 @@ export function ProductwiseFilterForm({
         >
           Reset to today
         </Link>
+        <a
+          href={exportHref}
+          className="inline-flex shrink-0 items-center whitespace-nowrap rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+        >
+          Download CSV
+        </a>
       </div>
     </form>
   );
