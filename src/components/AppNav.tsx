@@ -316,12 +316,13 @@ export function AppNav({
             className="flex shrink-0 items-center rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue"
           >
             <Image
-              src="/medseb-logo.png"
-              alt="MedSeb Pharmacy POS"
-              width={320}
-              height={82}
+              src="/reimed-logo-header.png"
+              alt="REIMED Pharmacy POS"
+              width={470}
+              height={156}
               className="h-10 w-auto drop-shadow-[0_2px_12px_rgba(0,120,215,0.45)] sm:h-16"
               priority
+              unoptimized
             />
           </Link>
           <div className="min-w-0 flex-1 sm:flex-none">
