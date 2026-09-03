@@ -10,6 +10,12 @@ import {
   PRODUCT_CATEGORY_LABELS,
   type ProductCategory,
 } from "@/lib/product-categories";
+import {
+  DEFAULT_PRODUCT_TYPE,
+  PRODUCT_TYPES,
+  PRODUCT_TYPE_LABELS,
+  type ProductType,
+} from "@/lib/product-types";
 import { compactSearchKey } from "@/lib/search-normalize";
 import { drugCodeFormValue, JANAUSHADHI_DRUG_CODE_REQUIRED_ERROR } from "@/lib/drug-code";
 import { CatalogBrandSearchField } from "./catalog-brand-search-field";
@@ -27,6 +33,7 @@ export type ProductFormValues = {
   brandName: string;
   genericName: string;
   productCategory: ProductCategory;
+  productType: ProductType;
   packSize: number;
   reorderMin: number;
   gstPct: number;
@@ -48,6 +55,7 @@ function emptyValues(): ProductFormValues {
     brandName: "",
     genericName: "",
     productCategory: DEFAULT_PRODUCT_CATEGORY,
+    productType: DEFAULT_PRODUCT_TYPE,
     packSize: 10,
     reorderMin: 0,
     gstPct: 5,
@@ -71,6 +79,9 @@ export function ProductForm({
   const [productCategory, setProductCategory] = useState<ProductCategory>(
     initial?.productCategory ?? DEFAULT_PRODUCT_CATEGORY,
   );
+  const [productType, setProductType] = useState<ProductType>(
+    initial?.productType ?? DEFAULT_PRODUCT_TYPE,
+  );
   const [brandQ, setBrandQ] = useState(initial?.brandName ?? "");
   const [brandId, setBrandId] = useState<string | null>(initial?.brandId ?? null);
   const [lockedBrandName, setLockedBrandName] = useState<string | null>(
@@ -90,6 +101,7 @@ export function ProductForm({
     setDrugCode(initial.drugCode ?? "");
     setGenericName(initial.genericName ?? "");
     setProductCategory(initial.productCategory ?? DEFAULT_PRODUCT_CATEGORY);
+    setProductType(initial.productType ?? DEFAULT_PRODUCT_TYPE);
     setBrandQ(initial.brandName ?? "");
     setBrandId(initial.brandId ?? null);
     setLockedBrandName(initial.brandId ? (initial.brandName ?? null) : null);
@@ -200,6 +212,7 @@ export function ProductForm({
         drugCode: productCategory === "JANAUSHADHI" ? drugCode.trim() : undefined,
         genericName: genericName.trim() || undefined,
         productCategory,
+        productType,
         brandId,
         packSize,
         reorderMin,
@@ -223,6 +236,7 @@ export function ProductForm({
         setDrugCode(cleared.drugCode);
         setGenericName(cleared.genericName);
         setProductCategory(cleared.productCategory);
+        setProductType(cleared.productType);
         setBrandQ("");
         setBrandId(null);
         setLockedBrandName(null);
@@ -298,6 +312,21 @@ export function ProductForm({
             {PRODUCT_CATEGORIES.map((c) => (
               <option key={c} value={c}>
                 {PRODUCT_CATEGORY_LABELS[c]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex w-[7.5rem] flex-col gap-1">
+          <span className={labelCls}>Type</span>
+          <select
+            className={inputCls}
+            aria-label="Product type"
+            value={productType}
+            onChange={(e) => setProductType(e.target.value as ProductType)}
+          >
+            {PRODUCT_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {PRODUCT_TYPE_LABELS[t]}
               </option>
             ))}
           </select>
@@ -387,6 +416,7 @@ export function productRowToFormValues(row: {
   brandName: string | null;
   genericName: string | null;
   productCategory: string | null;
+  productType: string | null;
   packSize: number;
   reorderMin: number;
   gstPct: number;
@@ -402,6 +432,10 @@ export function productRowToFormValues(row: {
       row.productCategory && PRODUCT_CATEGORIES.includes(row.productCategory as ProductCategory)
         ? (row.productCategory as ProductCategory)
         : DEFAULT_PRODUCT_CATEGORY,
+    productType:
+      row.productType && PRODUCT_TYPES.includes(row.productType as ProductType)
+        ? (row.productType as ProductType)
+        : DEFAULT_PRODUCT_TYPE,
     packSize: row.packSize,
     reorderMin: row.reorderMin,
     gstPct: row.gstPct,

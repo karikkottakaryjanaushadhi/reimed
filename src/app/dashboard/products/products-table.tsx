@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { buildSimpleListUrl } from "@/lib/list-pagination";
 import { gstPctNumber } from "@/lib/product-gst-slabs";
 import { productCategoryLabel } from "@/lib/product-categories";
+import { productTypeLabel } from "@/lib/product-types";
 import { displayDrugCode } from "@/lib/drug-code";
 import { ProductForm, productRowToFormValues } from "./product-form";
 import { ProductsListMobile } from "./products-list-mobile";
@@ -16,6 +17,7 @@ export type ProductListRow = {
   name: string;
   genericName: string | null;
   productCategory: string | null;
+  productType: string | null;
   brandId: string | null;
   brandName: string | null;
   packSize: number;
@@ -164,6 +166,7 @@ export function ProductsTable({
                 </Link>
               </th>
               <th className="px-4 py-3">Category</th>
+              <th className="px-4 py-3">Type</th>
               <th className="min-w-[8rem] px-4 py-3">Supplier</th>
               <th className="px-4 py-3 text-right">
                 <Link href={sortHref("stock")} className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
@@ -205,6 +208,9 @@ export function ProductsTable({
                   </td>
                   <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">
                     {productCategoryLabel(p.productCategory)}
+                  </td>
+                  <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">
+                    {productTypeLabel(p.productType)}
                   </td>
                   <td className="max-w-[12rem] truncate px-4 py-2 text-zinc-600 dark:text-zinc-400" title={p.suppliers ?? undefined}>
                     {p.suppliers ?? "—"}

@@ -8,6 +8,7 @@ import { generatedProductSku } from "@/lib/generated-sku";
 import { prisma } from "@/lib/prisma";
 import { isProductGstSlab, snapProductGstPct } from "@/lib/product-gst-slabs";
 import { isProductCategory } from "@/lib/product-categories";
+import { isProductType } from "@/lib/product-types";
 import { normalizeInventoryLotExpiryDate } from "@/lib/inventory-lot-expiry";
 import { lotSalePricingFromPurchaseLine } from "@/lib/inventory-lot-pricing";
 import { upsertInventoryLotStockFromPurchase } from "@/lib/inventory-lot-upsert";
@@ -34,6 +35,10 @@ const newProductSchema = z.object({
   productCategory: z
     .string()
     .refine((v) => isProductCategory(v), { message: "Invalid product category" })
+    .optional(),
+  productType: z
+    .string()
+    .refine((v) => isProductType(v), { message: "Invalid product type" })
     .optional(),
   gstPct: z.number().refine((n) => isProductGstSlab(n), { message: "GST % must be 0, 5, 18, or 40" }).optional(),
   drugCode: z.string().optional(),
@@ -186,6 +191,7 @@ export async function POST(req: Request) {
                   hsn: storeUpperOpt(np.hsn),
                   reorderMin: np.reorderMin ?? 0,
                   ...(np.productCategory !== undefined ? { productCategory: np.productCategory } : {}),
+                  ...(np.productType !== undefined ? { productType: np.productType } : {}),
                   ...(np.gstPct !== undefined ? { gstPct: np.gstPct } : {}),
                 },
               });

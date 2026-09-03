@@ -10,6 +10,12 @@ import {
   PRODUCT_CATEGORY_LABELS,
   type ProductCategory,
 } from "@/lib/product-categories";
+import {
+  DEFAULT_PRODUCT_TYPE,
+  PRODUCT_TYPES,
+  PRODUCT_TYPE_LABELS,
+  type ProductType,
+} from "@/lib/product-types";
 import { compactSearchKey } from "@/lib/search-normalize";
 import { JANAUSHADHI_DRUG_CODE_REQUIRED_ERROR } from "@/lib/drug-code";
 import { CatalogBrandSearchField } from "../products/catalog-brand-search-field";
@@ -19,11 +25,22 @@ const catalogLabelCls = "text-xs font-medium text-zinc-600 dark:text-zinc-400";
 const catalogInputCls =
   "w-full rounded-lg border border-zinc-300 px-2 py-2 dark:border-zinc-600 dark:bg-zinc-950";
 
-const NP_MODAL_FIELD_IDS = ["name", "brand", "category", "drugCode", "pack", "reorderMin", "gstPct", "apply"] as const;
+const NP_MODAL_FIELD_IDS = [
+  "name",
+  "genericName",
+  "brand",
+  "category",
+  "type",
+  "drugCode",
+  "pack",
+  "reorderMin",
+  "gstPct",
+  "apply",
+] as const;
 type NpModalField = (typeof NP_MODAL_FIELD_IDS)[number];
 
 function npModalFields(category: ProductCategory): NpModalField[] {
-  const fields: NpModalField[] = ["name", "brand", "category"];
+  const fields: NpModalField[] = ["name", "genericName", "brand", "category", "type"];
   if (category === "JANAUSHADHI") fields.push("drugCode");
   fields.push("pack", "reorderMin", "gstPct", "apply");
   return fields;
@@ -51,10 +68,12 @@ function focusNextNpModalField(current: NpModalField, category: ProductCategory)
 
 export type PurchaseNewProductModalResult = {
   name: string;
+  genericName: string;
   drugCode: string;
   brandId: string | null;
   brandName: string;
   productCategory: ProductCategory;
+  productType: ProductType;
   packSize: number;
   reorderMin: number;
   gstPct: number;
@@ -80,6 +99,7 @@ export function PurchaseNewProductModal({
   const brandFieldId = useId();
 
   const [name, setName] = useState("");
+  const [genericName, setGenericName] = useState("");
   const [drugCode, setDrugCode] = useState("");
   const [brandQ, setBrandQ] = useState("");
   const [brandId, setBrandId] = useState<string | null>(null);
@@ -88,12 +108,14 @@ export function PurchaseNewProductModal({
   const [brandHi, setBrandHi] = useState(0);
   const [packSize, setPackSize] = useState(10);
   const [productCategory, setProductCategory] = useState<ProductCategory>(DEFAULT_PRODUCT_CATEGORY);
+  const [productType, setProductType] = useState<ProductType>(DEFAULT_PRODUCT_TYPE);
   const [reorderMin, setReorderMin] = useState(0);
   const [gstPct, setGstPct] = useState(5);
 
   useEffect(() => {
     if (!open) return;
     setName(initial?.name?.trim() ?? "");
+    setGenericName(initial?.genericName?.trim() ?? "");
     setDrugCode(initial?.drugCode?.trim() ?? "");
     setBrandId(initial?.brandId ?? null);
     const bn = initial?.brandName?.trim() ?? "";
@@ -103,6 +125,7 @@ export function PurchaseNewProductModal({
     setBrandHi(0);
     setPackSize(Math.max(1, initial?.packSize ?? 10));
     setProductCategory(initial?.productCategory ?? DEFAULT_PRODUCT_CATEGORY);
+    setProductType(initial?.productType ?? DEFAULT_PRODUCT_TYPE);
     setReorderMin(Math.max(0, initial?.reorderMin ?? 0));
     setGstPct(initial?.gstPct ?? 5);
   }, [open, initial]);
@@ -243,10 +266,12 @@ export function PurchaseNewProductModal({
     }
     onApply({
       name: trimmed,
+      genericName: genericName.trim(),
       drugCode: productCategory === "JANAUSHADHI" ? drugCode.trim() : "",
       brandId,
       brandName: brandId ? (lockedBrandName ?? brandQ).trim() : brandQ.trim(),
       productCategory,
+      productType,
       packSize: Math.max(1, Math.floor(Number(packSize)) || 1),
       reorderMin: Math.max(0, Math.floor(Number(reorderMin)) || 0),
       gstPct: Number(gstPct),
@@ -289,6 +314,18 @@ export function PurchaseNewProductModal({
               data-np-field="name"
             />
           </label>
+          <label className="col-span-2 flex min-w-0 flex-col gap-1 md:min-w-[10rem] md:flex-1">
+            <span className={catalogLabelCls}>Generic name</span>
+            <input
+              placeholder="Optional"
+              className={catalogInputCls}
+              value={genericName}
+              onChange={(e) => setGenericName(e.target.value)}
+              onKeyDown={(e) => onNpFieldEnter(e, "genericName")}
+              autoComplete="off"
+              data-np-field="genericName"
+            />
+          </label>
           <CatalogBrandSearchField
             fieldId={brandFieldId}
             labelCls={catalogLabelCls}
@@ -321,6 +358,23 @@ export function PurchaseNewProductModal({
               {PRODUCT_CATEGORIES.map((c) => (
                 <option key={c} value={c}>
                   {PRODUCT_CATEGORY_LABELS[c]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex min-w-0 flex-col gap-1 md:w-[7.5rem]">
+            <span className={catalogLabelCls}>Type</span>
+            <select
+              className={catalogInputCls}
+              aria-label="Product type"
+              value={productType}
+              onChange={(e) => setProductType(e.target.value as ProductType)}
+              onKeyDown={(e) => onNpFieldEnter(e, "type")}
+              data-np-field="type"
+            >
+              {PRODUCT_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {PRODUCT_TYPE_LABELS[t]}
                 </option>
               ))}
             </select>

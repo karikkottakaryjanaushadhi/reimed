@@ -4,6 +4,7 @@ import Link from "next/link";
 import { gstPctNumber } from "@/lib/product-gst-slabs";
 import { displayDrugCode } from "@/lib/drug-code";
 import { productCategoryLabel } from "@/lib/product-categories";
+import { productTypeLabel } from "@/lib/product-types";
 import type { ProductListRow } from "./products-table";
 
 function stockCellClass(stockQty: number, reorderMin: number): string {
@@ -65,6 +66,10 @@ export function ProductsListMobile({
               <div>
                 <dt className="text-xs text-zinc-500">Category</dt>
                 <dd>{productCategoryLabel(p.productCategory)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-zinc-500">Type</dt>
+                <dd>{productTypeLabel(p.productType)}</dd>
               </div>
               <div>
                 <dt className="text-xs text-zinc-500">Pack</dt>

@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { storeUpper, storeUpperNull } from "@/lib/store-text";
 import { isProductGstSlab } from "@/lib/product-gst-slabs";
 import { isProductCategory } from "@/lib/product-categories";
+import { isProductType } from "@/lib/product-types";
 
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
@@ -24,6 +25,10 @@ const patchSchema = z.object({
   productCategory: z
     .string()
     .refine((v) => isProductCategory(v), { message: "Invalid product category" })
+    .optional(),
+  productType: z
+    .string()
+    .refine((v) => isProductType(v), { message: "Invalid product type" })
     .optional(),
   gstPct: z
     .number()
@@ -75,6 +80,9 @@ export async function PATCH(
         : {}),
       ...(parsed.data.productCategory !== undefined
         ? { productCategory: parsed.data.productCategory }
+        : {}),
+      ...(parsed.data.productType !== undefined
+        ? { productType: parsed.data.productType }
         : {}),
       ...(parsed.data.gstPct !== undefined ? { gstPct: parsed.data.gstPct } : {}),
     },

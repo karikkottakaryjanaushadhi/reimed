@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { compactSearchKey, sortByProductSearchRelevance } from "@/lib/search-normalize";
 import { isProductGstSlab } from "@/lib/product-gst-slabs";
 import { isProductCategory } from "@/lib/product-categories";
+import { isProductType } from "@/lib/product-types";
 import { storeUpper, storeUpperNull, storeUpperOpt } from "@/lib/store-text";
 
 export async function GET(req: Request) {
@@ -27,6 +28,7 @@ export async function GET(req: Request) {
         name: true,
         genericName: true,
         productCategory: true,
+        productType: true,
         packSize: true,
         gstPct: true,
         reorderMin: true,
@@ -71,6 +73,7 @@ export async function GET(req: Request) {
       name: true,
       genericName: true,
       productCategory: true,
+      productType: true,
       packSize: true,
       gstPct: true,
       reorderMin: true,
@@ -99,6 +102,10 @@ const createSchema = z.object({
   productCategory: z
     .string()
     .refine((v) => isProductCategory(v), { message: "Invalid product category" })
+    .optional(),
+  productType: z
+    .string()
+    .refine((v) => isProductType(v), { message: "Invalid product type" })
     .optional(),
   gstPct: z
     .number()
@@ -166,6 +173,9 @@ export async function POST(req: Request) {
           reorderMin: parsed.data.reorderMin ?? 0,
           ...(parsed.data.productCategory !== undefined
             ? { productCategory: parsed.data.productCategory }
+            : {}),
+          ...(parsed.data.productType !== undefined
+            ? { productType: parsed.data.productType }
             : {}),
           ...(parsed.data.gstPct !== undefined ? { gstPct: parsed.data.gstPct } : {}),
         },

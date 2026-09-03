@@ -179,6 +179,7 @@ export default async function ProductsPage({
              p."name" AS "name",
              p."genericName" AS "genericName",
              p."productCategory" AS "productCategory",
+             p."productType" AS "productType",
              p."brandId" AS "brandId",
              p."packSize" AS "packSize",
              p."reorderMin" AS "reorderMin",
@@ -191,7 +192,7 @@ export default async function ProductsPage({
       LEFT JOIN "InventoryLot" il ON il."productId" = p."id"
       LEFT JOIN "Supplier" s ON s."id" = il."supplierId"
       WHERE ${whereSql}
-      GROUP BY p."id", p."sku", p."name", p."genericName", p."productCategory", p."brandId", p."packSize", p."reorderMin", p."gstPct", b."name"
+      GROUP BY p."id", p."sku", p."name", p."genericName", p."productCategory", p."productType", p."brandId", p."packSize", p."reorderMin", p."gstPct", b."name"
       ${havingSql}
       ORDER BY ${productSortOrder(sort, dir, storeId)}
       LIMIT ${pageSize}
@@ -205,6 +206,7 @@ export default async function ProductsPage({
     name: p.name,
     genericName: p.genericName,
     productCategory: p.productCategory,
+    productType: p.productType,
     brandId: p.brandId,
     brandName: p.brandName,
     packSize: Number(p.packSize) || 1,

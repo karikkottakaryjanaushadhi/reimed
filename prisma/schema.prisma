@@ -103,6 +103,8 @@ model Product {
   genericName String?
   /// GENERIC | STATIONARY | ETHICAL | VETERINARY | JANAUSHADHI | COSMETIC | SURGICAL
   productCategory String     @default("GENERIC")
+  /// CAPSULES | CREAMS | … | TABLETS | EQUIPMENT
+  productType String         @default("TABLETS")
   packSize    Int            @default(1) // units per strip/pack; billing column
   unit        String         @default("unit")
   hsn         String?

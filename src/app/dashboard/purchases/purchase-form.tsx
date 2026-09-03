@@ -37,6 +37,7 @@ import {
 } from "@/lib/purchase-line";
 import { navigatePurchaseTable } from "@/lib/purchase-table-nav";
 import type { ProductCategory } from "@/lib/product-categories";
+import type { ProductType } from "@/lib/product-types";
 import { snapProductGstPct } from "@/lib/product-gst-slabs";
 import {
   PurchaseNewProductModal,
@@ -143,6 +144,8 @@ type Line = {
   catalogGstPct?: number;
   /** Category stored on Product for lines created as newProduct */
   catalogProductCategory?: ProductCategory;
+  /** Type stored on Product for lines created as newProduct */
+  catalogProductType?: ProductType;
   /** Drug code stored on Product.sku for lines created as newProduct */
   catalogDrugCode?: string;
   genericName?: string;
@@ -849,10 +852,12 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
       setNewProductModalLineIndex(lineIdx);
       setNewProductModalInitial({
         name: row.labelName,
+        genericName: row.genericName ?? "",
         packSize: row.pack,
         reorderMin: row.catalogReorderMin ?? 0,
         gstPct: row.catalogGstPct ?? row.gstPct ?? 5,
         productCategory: row.catalogProductCategory,
+        productType: row.catalogProductType,
         brandId: row.catalogBrandId ?? null,
         brandName: row.manufacturer ?? "",
         drugCode: row.catalogDrugCode ?? "",
@@ -861,10 +866,12 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
       setNewProductModalLineIndex(null);
       setNewProductModalInitial({
         name: draft.labelName,
+        genericName: draft.genericName ?? "",
         packSize: draft.pack,
         reorderMin: draft.catalogReorderMin ?? 0,
         gstPct: draft.catalogGstPct ?? 5,
         productCategory: draft.catalogProductCategory,
+        productType: draft.catalogProductType,
         brandId: draft.catalogBrandId ?? null,
         brandName: draft.manufacturer ?? "",
         drugCode: draft.catalogDrugCode ?? "",
@@ -891,11 +898,13 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
             ...row,
             productId: null,
             labelName: v.name,
+            genericName: v.genericName.trim() || undefined,
             manufacturer: v.brandName.trim() || undefined,
             catalogBrandId: v.brandId,
             catalogReorderMin: v.reorderMin,
             catalogGstPct: v.gstPct,
             catalogProductCategory: v.productCategory,
+            catalogProductType: v.productType,
             catalogDrugCode:
               v.productCategory === "JANAUSHADHI" && v.drugCode.trim()
                 ? v.drugCode.trim()
@@ -912,11 +921,13 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
         ...d,
         productId: null,
         labelName: v.name,
+        genericName: v.genericName.trim() || undefined,
         manufacturer: v.brandName.trim() || undefined,
         catalogBrandId: v.brandId,
         catalogReorderMin: v.reorderMin,
         catalogGstPct: v.gstPct,
         catalogProductCategory: v.productCategory,
+        catalogProductType: v.productType,
         catalogDrugCode:
           v.productCategory === "JANAUSHADHI" && v.drugCode.trim() ? v.drugCode.trim() : undefined,
         pack: v.packSize,
@@ -1091,12 +1102,14 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
           reorderMin: number;
           gstPct: number;
           productCategory?: ProductCategory;
+          productType?: ProductType;
         } = {
           name: l.labelName,
           packSize: Math.max(1, Math.trunc(l.pack) || 1),
           reorderMin: l.catalogReorderMin ?? 0,
           gstPct: l.catalogGstPct ?? 5,
           productCategory: l.catalogProductCategory,
+          productType: l.catalogProductType,
         };
         const bid = l.catalogBrandId?.trim();
         if (bid) {

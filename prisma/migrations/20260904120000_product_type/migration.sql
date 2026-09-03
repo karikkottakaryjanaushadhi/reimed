@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Product" ADD COLUMN "productType" TEXT NOT NULL DEFAULT 'TABLETS';

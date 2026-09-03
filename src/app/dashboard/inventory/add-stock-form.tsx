@@ -7,6 +7,7 @@ import { ExpiryDateInput } from "@/components/expiry-date-input";
 import { NumericTableInput } from "@/components/numeric-table-input";
 import { anchorRectBelow, floatingDropdownMaxHeight } from "@/lib/floating-dropdown";
 import type { ProductCategory } from "@/lib/product-categories";
+import type { ProductType } from "@/lib/product-types";
 import {
   patchPurchaseLinePack,
   purchaseLineCostGross,
@@ -62,6 +63,7 @@ type StockLine = {
   catalogReorderMin?: number;
   catalogGstPct?: number;
   catalogProductCategory?: ProductCategory;
+  catalogProductType?: ProductType;
   catalogDrugCode?: string;
   manufacturer?: string;
 };
@@ -315,6 +317,7 @@ export function AddStockForm({
         reorderMin: line.catalogReorderMin ?? 0,
         gstPct: line.catalogGstPct ?? line.gstPct ?? 5,
         productCategory: line.catalogProductCategory,
+        productType: line.catalogProductType,
         brandId: line.catalogBrandId ?? null,
         brandName: line.manufacturer ?? "",
         drugCode: line.catalogDrugCode ?? "",
@@ -341,6 +344,7 @@ export function AddStockForm({
       catalogReorderMin: v.reorderMin,
       catalogGstPct: v.gstPct,
       catalogProductCategory: v.productCategory,
+      catalogProductType: v.productType,
       catalogDrugCode:
         v.productCategory === "JANAUSHADHI" && v.drugCode.trim() ? v.drugCode.trim() : undefined,
       gstPct: v.gstPct,
@@ -393,6 +397,7 @@ export function AddStockForm({
       packSize: line.pack,
       reorderMin: line.catalogReorderMin ?? 0,
       productCategory: line.catalogProductCategory,
+      productType: line.catalogProductType,
       gstPct: line.catalogGstPct ?? line.gstPct,
     };
     if (line.catalogBrandId) body.brandId = line.catalogBrandId;
