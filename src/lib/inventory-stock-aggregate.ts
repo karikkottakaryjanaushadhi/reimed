@@ -1,13 +1,18 @@
 import { Prisma } from "@prisma/client";
 import { formatAppDateYmd, parseAppYmdStart } from "@/lib/app-timezone";
 import { prisma } from "@/lib/prisma";
-import { compactSearchKey, compareProductSearchRelevance } from "@/lib/search-normalize";
+import {
+  compactSearchKey,
+  compareProductSearchRelevance,
+  productSearchFieldsRelevanceScore,
+} from "@/lib/search-normalize";
 import { drugCodeSearchLikePattern } from "@/lib/drug-code";
 
 export type AggregatedStockRow = {
   productId: string;
   sku: string;
   name: string;
+  genericName: string | null;
   brand: string | null;
   supplier: string | null;
   packSize: number;
@@ -47,6 +52,7 @@ export async function aggregateStoreStock(params: {
       Prisma.sql`
         SELECT p."id" AS "id" FROM "Product" p
         WHERE replace(lower(p."name"), ' ', '') LIKE ${likePat}
+           OR replace(lower(COALESCE(p."genericName", '')), ' ', '') LIKE ${likePat}
            ${skuSearchSql}
         LIMIT 200
       `,
@@ -82,6 +88,7 @@ export async function aggregateStoreStock(params: {
       productId: string;
       sku: string;
       name: string;
+      genericName: string | null;
       brand: string | null;
       supplier: string | null;
       packSize: unknown;
@@ -100,6 +107,7 @@ export async function aggregateStoreStock(params: {
         p."id" AS "productId",
         p."sku" AS "sku",
         p."name" AS "name",
+        p."genericName" AS "genericName",
         b."name" AS "brand",
         NULLIF(string_agg(DISTINCT s."name", ', ' ORDER BY s."name"), '') AS "supplier",
         p."packSize" AS "packSize",
@@ -135,7 +143,7 @@ export async function aggregateStoreStock(params: {
         AND il."quantity" >= 0
         ${productIdClause}
         ${sellableClause}
-      GROUP BY p."id", p."sku", p."name", b."name", p."packSize", p."gstPct", p."reorderMin"
+      GROUP BY p."id", p."sku", p."name", p."genericName", b."name", p."packSize", p."gstPct", p."reorderMin"
     `,
   );
 
@@ -147,6 +155,7 @@ export async function aggregateStoreStock(params: {
       productId: r.productId,
       sku: r.sku,
       name: r.name,
+      genericName: r.genericName,
       brand: r.brand,
       supplier: r.supplier,
       packSize: Number(r.packSize) || 1,
@@ -163,7 +172,13 @@ export async function aggregateStoreStock(params: {
   });
 
   if (q) {
-    mapped.sort((a, b) => compareProductSearchRelevance(a.name, b.name, q));
+    mapped.sort((a, b) => {
+      const diff =
+        productSearchFieldsRelevanceScore(q, a.name, a.genericName) -
+        productSearchFieldsRelevanceScore(q, b.name, b.genericName);
+      if (diff !== 0) return diff;
+      return compareProductSearchRelevance(a.name, b.name, q);
+    });
   } else {
     mapped.sort((a, b) => (a.name < b.name ? -1 : 1));
   }

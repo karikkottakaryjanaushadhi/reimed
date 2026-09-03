@@ -53,6 +53,20 @@ export function compareProductSearchRelevance(aName: string, bName: string, quer
   return aName.localeCompare(bName);
 }
 
+/** Best (lowest) score among product name, generic, or other searchable fields. */
+export function productSearchFieldsRelevanceScore(
+  query: string,
+  ...fields: Array<string | null | undefined>
+): number {
+  let best = Number.MAX_SAFE_INTEGER;
+  for (const field of fields) {
+    if (!field) continue;
+    const score = productSearchRelevanceScore(field, query);
+    if (score < best) best = score;
+  }
+  return best;
+}
+
 export function sortByProductSearchRelevance<T>(
   items: readonly T[],
   query: string,

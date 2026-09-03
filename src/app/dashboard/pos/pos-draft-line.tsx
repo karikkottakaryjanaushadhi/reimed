@@ -43,6 +43,7 @@ type StockRow = {
   productId: string;
   sku: string;
   name: string;
+  genericName?: string | null;
   brand?: string | null;
   supplier?: string | null;
   mrpMin: number | null;
@@ -130,15 +131,22 @@ export function useDraftLine({
     const t = q.trim();
     if (!t) return [];
     const matches = allStock
-      .filter((p) => nameMatchesLooseQuery(p.name, t) || drugCodeMatchesQuery(p.sku, t))
+      .filter(
+        (p) =>
+          nameMatchesLooseQuery(p.name, t) ||
+          nameMatchesLooseQuery(p.genericName ?? "", t) ||
+          drugCodeMatchesQuery(p.sku, t),
+      )
       .map((p) => ({
         ...p,
         quantity: availableProductStock(p.quantity, cart, p.productId),
         expiredQuantity: p.expiredQuantity ?? 0,
       }));
-    return sortByProductSearchRelevance(matches, t, (p) =>
-      drugCodeMatchesQuery(p.sku, t) ? displayDrugCode(p.sku) || p.name : p.name,
-    );
+    return sortByProductSearchRelevance(matches, t, (p) => {
+      if (nameMatchesLooseQuery(p.name, t)) return p.name;
+      if (nameMatchesLooseQuery(p.genericName ?? "", t)) return p.genericName ?? p.name;
+      return displayDrugCode(p.sku) || p.name;
+    });
   }, [allStock, q, cart]);
 
   const visibleLots = useMemo(
@@ -718,6 +726,11 @@ function StockPickerList({
           >
             <span className="min-w-0 flex-1">
               <span className="block break-words font-medium text-zinc-900 dark:text-zinc-100">{p.name}</span>
+              {p.genericName ? (
+                <span className="mt-0.5 block truncate text-[10px] text-zinc-500 dark:text-zinc-400" title={p.genericName}>
+                  {p.genericName}
+                </span>
+              ) : null}
               {displayDrugCode(p.sku) ? (
                 <span className="mt-0.5 block font-mono text-[10px] text-zinc-400 dark:text-zinc-500">
                   {displayDrugCode(p.sku)}
@@ -935,7 +948,7 @@ export function DraftLineMobileCard({ draft }: { draft: DraftLineState }) {
       <div className="relative mt-1">
         <DraftLineProductSearch
           draft={draft}
-          placeholder="Product name…"
+          placeholder="Name or generic…"
           inputClassName={`w-full bg-white ${POS_FIELD_INPUT_CLASS}`}
           hideLabel
           searchInputRef={draft.searchInputMobileRef}
@@ -1073,7 +1086,7 @@ export function DraftLineTableRow({ draft }: { draft: DraftLineState }) {
         <div className="relative min-h-[2.5rem]">
           <DraftLineProductSearch
             draft={draft}
-            placeholder="Search product name…"
+            placeholder="Search name or generic…"
             inputClassName={`w-full bg-white px-2 py-2 dark:bg-zinc-950 ${POS_FIELD_INPUT_CLASS}`}
             searchInputRef={draft.searchInputDesktopRef}
             stockAnchorRef={draft.stockAnchorDesktopRef}
