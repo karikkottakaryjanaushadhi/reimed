@@ -66,6 +66,10 @@ export async function PATCH(
       });
       if (!oldLine) throw new Error("not_found");
       if (oldLine.purchase.complete) throw new Error("purchase_complete");
+      const returnCount = await tx.purchaseReturn.count({
+        where: { purchaseId, storeId },
+      });
+      if (returnCount > 0) throw new Error("purchase_has_returns");
 
       const productOk = await tx.product.findFirst({
         where: { id: parsed.data.productId },
@@ -203,6 +207,12 @@ export async function PATCH(
         { status: 403 },
       );
     }
+    if (msg === "purchase_has_returns") {
+      return NextResponse.json(
+        { error: "This purchase has returns. Lines cannot be changed." },
+        { status: 403 },
+      );
+    }
     if (msg === "invalid_product") return NextResponse.json({ error: "Invalid product" }, { status: 400 });
     if (msg === "invalid_expiry") return NextResponse.json({ error: "Invalid expiry date" }, { status: 400 });
     if (msg === "inventory_lot_missing") {
@@ -256,6 +266,10 @@ export async function DELETE(
       });
       if (!oldLine) throw new Error("not_found");
       if (oldLine.purchase.complete) throw new Error("purchase_complete");
+      const returnCount = await tx.purchaseReturn.count({
+        where: { purchaseId, storeId },
+      });
+      if (returnCount > 0) throw new Error("purchase_has_returns");
 
       const oldStockIn = oldLine.quantity + oldLine.freeQty;
       const oldLot = await findInventoryLotForPurchaseLineUndo(tx, {
@@ -294,6 +308,12 @@ export async function DELETE(
     if (msg === "purchase_complete") {
       return NextResponse.json(
         { error: "This purchase is finalized. Line changes are not allowed (view only)." },
+        { status: 403 },
+      );
+    }
+    if (msg === "purchase_has_returns") {
+      return NextResponse.json(
+        { error: "This purchase has returns. Lines cannot be changed." },
         { status: 403 },
       );
     }

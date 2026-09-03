@@ -99,6 +99,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       });
       if (!purchase) throw new Error("not_found");
       if (purchase.complete) throw new Error("purchase_complete");
+      const returnCount = await tx.purchaseReturn.count({
+        where: { purchaseId, storeId },
+      });
+      if (returnCount > 0) throw new Error("purchase_has_returns");
 
       const l = parsed.data;
       let productId = l.productId?.trim();
@@ -237,6 +241,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (msg === "purchase_complete") {
       return NextResponse.json(
         { error: "This purchase is finalized. Lines cannot be added (view only)." },
+        { status: 403 },
+      );
+    }
+    if (msg === "purchase_has_returns") {
+      return NextResponse.json(
+        { error: "This purchase has returns. Lines cannot be changed." },
         { status: 403 },
       );
     }

@@ -16,10 +16,11 @@ model User {
   active         Boolean     @default(true)
   createdAt      DateTime    @default(now())
   memberships        StoreUser[]
-  salesCreated         Sale[]       @relation("SaleCreatedBy")
-  saleReturnsCreated   SaleReturn[] @relation("SaleReturnCreatedBy")
-  purchasesCreated     Purchase[]       @relation("PurchaseCreatedBy")
-  transfersCreated     StockTransfer[]  @relation("TransferCreatedBy")
+  salesCreated              Sale[]            @relation("SaleCreatedBy")
+  saleReturnsCreated        SaleReturn[]      @relation("SaleReturnCreatedBy")
+  purchasesCreated          Purchase[]        @relation("PurchaseCreatedBy")
+  purchaseReturnsCreated    PurchaseReturn[]  @relation("PurchaseReturnCreatedBy")
+  transfersCreated          StockTransfer[]   @relation("TransferCreatedBy")
 }
 
 model Store {
@@ -39,12 +40,13 @@ model Store {
   createdAt       DateTime     @default(now())
   users           StoreUser[]
   lots            InventoryLot[]
-  sales           Sale[]
-  saleReturns     SaleReturn[]
-  purchases       Purchase[]
-  transfersFrom   StockTransfer[] @relation("TransfersFrom")
-  transfersTo     StockTransfer[] @relation("TransfersTo")
-  settings        StoreSettings?
+  sales             Sale[]
+  saleReturns       SaleReturn[]
+  purchases         Purchase[]
+  purchaseReturns   PurchaseReturn[]
+  transfersFrom     StockTransfer[] @relation("TransfersFrom")
+  transfersTo       StockTransfer[] @relation("TransfersTo")
+  settings          StoreSettings?
 }
 
 model StoreSettings {
@@ -172,8 +174,9 @@ model Purchase {
   createdById String
   store       Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
   supplier    Supplier       @relation(fields: [supplierId], references: [id])
-  createdBy   User           @relation("PurchaseCreatedBy", fields: [createdById], references: [id])
+  createdBy   User             @relation("PurchaseCreatedBy", fields: [createdById], references: [id])
   lines       PurchaseLine[]
+  returns     PurchaseReturn[]
 
   @@unique([storeId, purchaseNo])
   @@index([storeId, createdAt])
@@ -202,9 +205,44 @@ model PurchaseLine {
   gstPct              Decimal  @default(0)
   purchase            Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   product             Product  @relation(fields: [productId], references: [id])
+  returnLines         PurchaseReturnLine[]
 
   @@index([purchaseId])
   @@index([productId])
+}
+
+model PurchaseReturn {
+  id             String   @id @default(cuid())
+  storeId        String
+  purchaseId     String
+  createdAt      DateTime @default(now())
+  createdById    String
+  note           String?
+  /// Supplier credit note reference (optional).
+  creditNoteNo   String?
+  creditNoteDate DateTime?
+  /// GST-inclusive credit total (sum of line credits).
+  total          Decimal  @db.Decimal(12, 2)
+  store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  purchase       Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  createdBy      User     @relation("PurchaseReturnCreatedBy", fields: [createdById], references: [id])
+  lines          PurchaseReturnLine[]
+
+  @@index([storeId, createdAt])
+  @@index([purchaseId])
+}
+
+model PurchaseReturnLine {
+  id               String         @id @default(cuid())
+  purchaseReturnId String
+  purchaseLineId   String
+  qty              Int
+  /// GST-inclusive credit for this line (proportional to purchase line payable).
+  creditTotal      Decimal        @db.Decimal(12, 2)
+  purchaseReturn   PurchaseReturn @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
+  purchaseLine     PurchaseLine   @relation(fields: [purchaseLineId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseLineId])
 }
 
 model Sale {

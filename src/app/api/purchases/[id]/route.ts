@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthContext, isManager } from "@/lib/auth-context";
 import { prisma } from "@/lib/prisma";
+import { purchaseBillTotalsFromLines, purchaseLineTotalWithGst } from "@/lib/purchase-line";
+import { netPurchaseTotal } from "@/lib/purchase-return-aggregates";
+import { snapProductGstPct } from "@/lib/product-gst-slabs";
 import { storeUpperOpt } from "@/lib/store-text";
 
 const patchSchema = z
@@ -34,8 +37,9 @@ export async function GET(
   if (!isManager(ctx)) return NextResponse.json({ error: "Managers only" }, { status: 403 });
 
   const { id } = await params;
+  const storeId = ctx.activeStoreId;
   const purchase = await prisma.purchase.findFirst({
-    where: { id, storeId: ctx.activeStoreId },
+    where: { id, storeId },
     include: {
       supplier: { select: { id: true, name: true } },
       createdBy: { select: { name: true, email: true } },
@@ -46,7 +50,70 @@ export async function GET(
     },
   });
   if (!purchase) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ purchase });
+
+  const returnedAgg = await prisma.purchaseReturnLine.groupBy({
+    by: ["purchaseLineId"],
+    where: { purchaseReturn: { purchaseId: id, storeId } },
+    _sum: { qty: true },
+  });
+  const returnedByLine = new Map<string, number>();
+  for (const row of returnedAgg) {
+    returnedByLine.set(row.purchaseLineId, row._sum.qty ?? 0);
+  }
+
+  const [returnTotalsAgg, returnCount] = await Promise.all([
+    prisma.purchaseReturn.aggregate({
+      where: { purchaseId: id, storeId },
+      _sum: { total: true },
+    }),
+    prisma.purchaseReturn.count({
+      where: { purchaseId: id, storeId },
+    }),
+  ]);
+  const returnCreditsTotal = Number(returnTotalsAgg._sum.total ?? 0);
+
+  const billTotals = purchaseBillTotalsFromLines(
+    purchase.lines.map((line) => ({
+      quantity: line.quantity,
+      costPrice: Number(line.costPrice),
+      pack: line.pack,
+      purchaseDiscountPct: Number(line.purchaseDiscountPct),
+      purchaseDiscountRs: Number(line.purchaseDiscountRs),
+      schemeDiscountPct: Number(line.schemeDiscountPct),
+      schemeDiscountRs: Number(line.schemeDiscountRs),
+      gstPct: snapProductGstPct(line.gstPct),
+    })),
+  );
+  const netTotal = netPurchaseTotal(billTotals.grandTotal, returnCreditsTotal);
+
+  return NextResponse.json({
+    purchase: {
+      ...purchase,
+      returnCreditsTotal,
+      returnCount,
+      billGrandTotal: billTotals.grandTotal,
+      netTotal,
+      lines: purchase.lines.map((line) => {
+        const returnedQty = returnedByLine.get(line.id) ?? 0;
+        const linePayable = purchaseLineTotalWithGst({
+          quantity: line.quantity,
+          costPrice: Number(line.costPrice),
+          pack: line.pack,
+          schemeDiscountPct: Number(line.schemeDiscountPct),
+          schemeDiscountRs: Number(line.schemeDiscountRs),
+          purchaseDiscountPct: Number(line.purchaseDiscountPct),
+          purchaseDiscountRs: Number(line.purchaseDiscountRs),
+          gstPct: Number(line.gstPct),
+        });
+        return {
+          ...line,
+          returnedQty,
+          returnableQty: Math.max(0, line.quantity - returnedQty),
+          linePayable,
+        };
+      }),
+    },
+  });
 }
 
 export async function PATCH(
@@ -75,6 +142,16 @@ export async function PATCH(
   if (existing.complete) {
     return NextResponse.json(
       { error: "This purchase is finalized. No further changes are allowed (view only)." },
+      { status: 403 },
+    );
+  }
+
+  const returnCount = await prisma.purchaseReturn.count({
+    where: { purchaseId: id, storeId: ctx.activeStoreId },
+  });
+  if (returnCount > 0) {
+    return NextResponse.json(
+      { error: "This purchase has returns and can no longer be edited." },
       { status: 403 },
     );
   }

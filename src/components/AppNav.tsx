@@ -57,6 +57,7 @@ const navConfig: (NavLinkDef | NavMenuDef)[] = [
     items: [
       { href: "/dashboard/purchases/new", label: "New purchase" },
       { href: "/dashboard/purchases", label: "Purchase list" },
+      { href: "/dashboard/purchases/returns", label: "Purchase returns" },
     ],
   },
   {
@@ -298,7 +299,7 @@ export function AppNav({
 
   return (
     <header className="border-b border-zinc-800 bg-black">
-      <div className="mx-auto flex w-full max-w-[1520px] items-center justify-between gap-3 px-4 py-2 sm:px-8 lg:px-10">
+      <div className="mx-auto flex w-full max-w-[1520px] items-center justify-between gap-3 px-4 py-3 sm:px-8 lg:px-10">
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
           <button
             type="button"
@@ -312,16 +313,15 @@ export function AppNav({
           </button>
           <Link
             href="/dashboard"
-            className="flex shrink-0 items-center rounded-lg bg-white px-1 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue"
+            className="flex shrink-0 items-center rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue"
           >
             <Image
-              src="/reimed-logo-header.png"
-              alt="REIMED"
-              width={470}
-              height={156}
-              className="h-9 w-auto sm:h-11"
+              src="/medseb-logo.png"
+              alt="MedSeb Pharmacy POS"
+              width={320}
+              height={82}
+              className="h-10 w-auto drop-shadow-[0_2px_12px_rgba(0,120,215,0.45)] sm:h-16"
               priority
-              unoptimized
             />
           </Link>
           <div className="min-w-0 flex-1 sm:flex-none">
