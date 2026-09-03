@@ -3,8 +3,10 @@
 export type ProductwiseCardRow = {
   productId: string;
   productName: string;
+  supplier: string | null;
   quantity: number;
   returnQty: number;
+  remainingQty: number;
   billCount: number;
   gross: number;
   discount: number;
@@ -49,6 +51,10 @@ export function ProductwiseListMobile({
             <p className="shrink-0 text-right text-lg font-semibold tabular-nums">₹{item.netRevenue.toFixed(2)}</p>
           </div>
           <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <div className="col-span-2">
+              <dt className="text-xs text-zinc-500">Supplier</dt>
+              <dd className="truncate text-zinc-600 dark:text-zinc-400">{item.supplier ?? "—"}</dd>
+            </div>
             <div>
               <dt className="text-xs text-zinc-500">Net qty</dt>
               <dd className="tabular-nums">
@@ -57,6 +63,10 @@ export function ProductwiseListMobile({
                   <span className="ml-1 text-xs text-amber-700 dark:text-amber-300">(−{item.returnQty})</span>
                 ) : null}
               </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-zinc-500">Remaining qty</dt>
+              <dd className="tabular-nums">{item.remainingQty}</dd>
             </div>
             <div>
               <dt className="text-xs text-zinc-500">Bills</dt>

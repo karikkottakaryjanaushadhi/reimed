@@ -8,6 +8,7 @@ import { ListPageSizeControls, ListPaginationNav } from "@/components/list-pagin
 import { getAuthContext } from "@/lib/auth-context";
 import { createdAtDatetimeRange } from "@/lib/date-range-filter";
 import { DEFAULT_LIST_PAGE_SIZE, parseListLimitParam } from "@/lib/list-pagination";
+import { aggregateStoreStock } from "@/lib/inventory-stock-aggregate";
 import {
   aggregateProductwiseSales,
   productwiseSaleLineWhere,
@@ -131,25 +132,43 @@ export default async function ProductwiseSalesPage({
     }),
   ]);
 
-  const productTotals = aggregateProductwiseSales(saleLines, returnLines).sort((a, b) => {
-    if (sort === "name") {
-      const cmp = a.productName.localeCompare(b.productName);
-      return dir === "asc" ? cmp : -cmp;
-    }
-    if (sort === "quantity") {
-      return dir === "asc" ? a.quantity - b.quantity : b.quantity - a.quantity;
-    }
-    if (sort === "gross") {
-      return dir === "asc" ? a.gross - b.gross : b.gross - a.gross;
-    }
-    if (sort === "billCount") {
-      return dir === "asc" ? a.billCount - b.billCount : b.billCount - a.billCount;
-    }
-    if (sort === "returnCredits") {
-      return dir === "asc" ? a.returnCredits - b.returnCredits : b.returnCredits - a.returnCredits;
-    }
-    return 0;
-  });
+  const salesRows = aggregateProductwiseSales(saleLines, returnLines);
+  const stockRows =
+    salesRows.length > 0
+      ? await aggregateStoreStock({
+          storeId: ctx.activeStoreId,
+          productIds: salesRows.map((r) => r.productId),
+        })
+      : [];
+  const balanceByProductId = new Map(
+    stockRows.map((r) => [r.productId, r.quantity + r.expiredQuantity] as const),
+  );
+  const supplierByProductId = new Map(stockRows.map((r) => [r.productId, r.supplier] as const));
+  const productTotals = salesRows
+    .map((row) => ({
+      ...row,
+      remainingQty: balanceByProductId.get(row.productId) ?? 0,
+      supplier: supplierByProductId.get(row.productId) ?? null,
+    }))
+    .sort((a, b) => {
+      if (sort === "name") {
+        const cmp = a.productName.localeCompare(b.productName);
+        return dir === "asc" ? cmp : -cmp;
+      }
+      if (sort === "quantity") {
+        return dir === "asc" ? a.quantity - b.quantity : b.quantity - a.quantity;
+      }
+      if (sort === "gross") {
+        return dir === "asc" ? a.gross - b.gross : b.gross - a.gross;
+      }
+      if (sort === "billCount") {
+        return dir === "asc" ? a.billCount - b.billCount : b.billCount - a.billCount;
+      }
+      if (sort === "returnCredits") {
+        return dir === "asc" ? a.returnCredits - b.returnCredits : b.returnCredits - a.returnCredits;
+      }
+      return 0;
+    });
 
   const totals = sumProductwiseRows(productTotals);
   const totalCount = productTotals.length;
@@ -264,8 +283,10 @@ export default async function ProductwiseSalesPage({
         items={pageItems.map((item) => ({
           productId: item.productId,
           productName: item.productName,
+          supplier: item.supplier,
           quantity: item.quantity,
           returnQty: item.returnQty,
+          remainingQty: item.remainingQty,
           billCount: item.billCount,
           gross: item.gross,
           discount: item.discount,
@@ -293,6 +314,7 @@ export default async function ProductwiseSalesPage({
                   Product {sort === "name" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
+              <th className="min-w-[8rem] px-4 py-3">Supplier</th>
               <th className="px-4 py-3">
                 <Link
                   href={buildProductwiseSearchUrl("/dashboard/sales/productwise", 1, pageSize, {
@@ -305,6 +327,7 @@ export default async function ProductwiseSalesPage({
                   Net qty {sort === "quantity" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
+              <th className="px-4 py-3">Remaining qty</th>
               <th className="px-4 py-3">
                 <Link
                   href={buildProductwiseSearchUrl("/dashboard/sales/productwise", 1, pageSize, {
@@ -351,12 +374,19 @@ export default async function ProductwiseSalesPage({
             {pageItems.map((item) => (
               <tr key={item.productId} className="border-t border-zinc-100 dark:border-zinc-800">
                 <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">{item.productName}</td>
+                <td
+                  className="max-w-[12rem] truncate px-4 py-3 text-zinc-600 dark:text-zinc-400"
+                  title={item.supplier ?? undefined}
+                >
+                  {item.supplier ?? "—"}
+                </td>
                 <td className="px-4 py-3 text-zinc-600">
                   {item.quantity}
                   {item.returnQty > 0 ? (
                     <span className="ml-1 text-xs text-amber-700 dark:text-amber-300">(−{item.returnQty})</span>
                   ) : null}
                 </td>
+                <td className="px-4 py-3 tabular-nums text-zinc-600">{item.remainingQty}</td>
                 <td className="px-4 py-3 text-zinc-600">{item.billCount}</td>
                 <td className="px-4 py-3 text-right tabular-nums">₹{item.gross.toFixed(2)}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-zinc-600">₹{item.discount.toFixed(2)}</td>
@@ -373,7 +403,9 @@ export default async function ProductwiseSalesPage({
             <tfoot className="bg-zinc-50 text-sm font-semibold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
               <tr className="border-t-2 border-zinc-200 dark:border-zinc-700">
                 <td className="px-4 py-3">Total (all products)</td>
+                <td className="px-4 py-3">—</td>
                 <td className="px-4 py-3 tabular-nums">{totals.quantity}</td>
+                <td className="px-4 py-3">—</td>
                 <td className="px-4 py-3">—</td>
                 <td className="px-4 py-3 text-right tabular-nums">₹{totals.gross.toFixed(2)}</td>
                 <td className="px-4 py-3 text-right tabular-nums">₹{totals.discount.toFixed(2)}</td>
