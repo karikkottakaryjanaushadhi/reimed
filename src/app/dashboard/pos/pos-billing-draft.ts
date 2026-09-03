@@ -10,6 +10,8 @@ export type PosBillingDraft = {
   doctorName: string;
   paymentMode: string;
   paid?: boolean;
+  /** Cash tendered amount as typed string; empty when unset. */
+  cashReceived?: string;
 };
 
 export function posBillingDraftKey(storeId: string): string {

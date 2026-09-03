@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import { DatePickerInput } from "@/components/date-picker-input";
 import { PurchaseEditingInProgressSwitch } from "./purchase-editing-in-progress-switch";
@@ -38,6 +38,8 @@ export function PurchaseDetailClient({
 }) {
   const router = useRouter();
   const linesEditorRef = useRef<PurchaseLinesEditorHandle>(null);
+  const invoiceRefInputRef = useRef<HTMLInputElement>(null);
+  const invoiceDateRef = useRef<HTMLInputElement>(null);
   const [suppliers, setSuppliers] = useState<SupplierOpt[]>([
     { id: initialSupplierId, name: initialSupplierName },
   ]);
@@ -53,6 +55,12 @@ export function PurchaseDetailClient({
   function clearFeedback() {
     setMsg(null);
     setErr(null);
+  }
+
+  function onHeaderFieldEnter(e: KeyboardEvent, next: () => void) {
+    if (e.key !== "Enter" || fieldsDisabled) return;
+    e.preventDefault();
+    next();
   }
 
   useEffect(() => {
@@ -181,6 +189,9 @@ export function PurchaseDetailClient({
                   clearFeedback();
                   setSupplierId(e.target.value);
                 }}
+                onKeyDown={(e) =>
+                  onHeaderFieldEnter(e, () => invoiceRefInputRef.current?.focus())
+                }
                 aria-label="Supplier"
               >
                 {suppliers.map((s) => (
@@ -193,6 +204,7 @@ export function PurchaseDetailClient({
             <label className="text-sm">
               <span className="text-zinc-500">Invoice ref</span>
               <input
+                ref={invoiceRefInputRef}
                 className={fieldCls}
                 value={invoiceRef}
                 disabled={fieldsDisabled}
@@ -200,11 +212,15 @@ export function PurchaseDetailClient({
                   clearFeedback();
                   setInvoiceRef(e.target.value);
                 }}
+                onKeyDown={(e) =>
+                  onHeaderFieldEnter(e, () => invoiceDateRef.current?.focus())
+                }
               />
             </label>
             <label className="text-sm">
               <span className="text-zinc-500">Invoice date</span>
               <DatePickerInput
+                ref={invoiceDateRef}
                 className="rounded-lg border border-zinc-300 px-2 py-2 dark:border-zinc-600 dark:bg-zinc-950"
                 wrapperClassName="mt-1 w-full"
                 value={invoiceDate}
@@ -213,6 +229,9 @@ export function PurchaseDetailClient({
                   clearFeedback();
                   setInvoiceDate(e.target.value);
                 }}
+                onKeyDown={(e) =>
+                  onHeaderFieldEnter(e, () => linesEditorRef.current?.focusAddProductSearch())
+                }
               />
             </label>
           </div>

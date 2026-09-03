@@ -138,6 +138,8 @@ function newLineId(): string {
 export type PurchaseLinesEditorHandle = {
   /** Persists line deletes, updates, and new rows. Returns an error message or null on success. */
   persistLines: () => Promise<string | null>;
+  /** Focus the add-row product search (desktop or mobile, whichever is visible). */
+  focusAddProductSearch: () => void;
 };
 
 function emptyAddDraft(): PurchaseLineDraft {
@@ -262,7 +264,15 @@ export const PurchaseLinesEditor = forwardRef<
 
   function focusAddRowNameSearch() {
     requestAnimationFrame(() => {
-      document.getElementById(addSearchId)?.focus({ preventScroll: true });
+      const desktop = document.getElementById(addSearchId);
+      const mobile = document.getElementById(addSearchIdMobile);
+      const target =
+        desktop && desktop.offsetParent !== null
+          ? desktop
+          : mobile && mobile.offsetParent !== null
+            ? mobile
+            : desktop ?? mobile;
+      (target as HTMLElement | null)?.focus({ preventScroll: true });
     });
   }
 
@@ -635,7 +645,14 @@ export const PurchaseLinesEditor = forwardRef<
     draft,
   ]);
 
-  useImperativeHandle(ref, () => ({ persistLines }), [persistLines]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      persistLines,
+      focusAddProductSearch: focusAddRowNameSearch,
+    }),
+    [persistLines],
+  );
 
   const editorNavRowKeys = useMemo(
     () => (disabled ? lineIds : [...lineIds, "__add__"]),

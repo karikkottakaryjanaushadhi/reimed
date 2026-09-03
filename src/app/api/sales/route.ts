@@ -7,7 +7,7 @@ import { randomPlaceholderCustomerName, randomPlaceholderDoctorName } from "@/li
 import { storeUpper, storeUpperOpt } from "@/lib/store-text";
 import { posSaleLineInputSchema, resolvePosSaleLinesInTransaction } from "@/lib/sale-checkout-resolve";
 import { netSaleTotal, returnCreditsBySaleIds } from "@/lib/sale-return-aggregates";
-import { defaultSalePaid } from "@/lib/sale-paid";
+import { defaultSalePaid, resolveSaleCashReceived } from "@/lib/sale-paid";
 
 const bodySchema = z.object({
   customerName: z.string().optional(),
@@ -15,6 +15,7 @@ const bodySchema = z.object({
   doctorName: z.string().optional(),
   paymentMode: z.enum(["CASH", "CARD", "UPI", "CREDIT"]).optional(),
   paid: z.boolean().optional(),
+  cashReceived: z.number().nonnegative().nullable().optional(),
   lines: z.array(posSaleLineInputSchema).min(1),
 });
 
@@ -73,6 +74,7 @@ export async function POST(req: Request) {
   const storeId = ctx.activeStoreId;
   const paymentMode = (parsed.data.paymentMode ?? "CASH") as PaymentMode;
   const paid = parsed.data.paid ?? defaultSalePaid(paymentMode);
+  const cashReceived = resolveSaleCashReceived(paymentMode, parsed.data.cashReceived);
 
   const customerName = storeUpper(
     parsed.data.customerName?.trim() || randomPlaceholderCustomerName(),
@@ -110,6 +112,7 @@ export async function POST(req: Request) {
           total,
           paymentMode,
           paid,
+          cashReceived,
           lines: {
             create: resolved.map((r) => ({
               productId: r.productId,

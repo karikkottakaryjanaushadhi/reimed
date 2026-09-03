@@ -231,6 +231,8 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
   const draftAnchorMobileRef = useRef<HTMLDivElement>(null);
   const linkAnchorRef = useRef<HTMLDivElement>(null);
   const linkAnchorMobileRef = useRef<HTMLDivElement>(null);
+  const invoiceNoRef = useRef<HTMLInputElement>(null);
+  const invoiceDateRef = useRef<HTMLInputElement>(null);
   /** Skips refetch while input still matches last pick (stops list reopening after select). */
   const supplierPickedLabelRef = useRef<string | null>(null);
 
@@ -387,40 +389,64 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
     setSupplierHitHi(-1);
   }
 
+  function focusInvoiceNo() {
+    invoiceNoRef.current?.focus();
+  }
+
+  function focusDraftProductSearch() {
+    const desktop = document.getElementById(draftSearchId);
+    const mobile = document.getElementById(draftSearchIdMobile);
+    const target =
+      desktop && desktop.offsetParent !== null
+        ? desktop
+        : mobile && mobile.offsetParent !== null
+          ? mobile
+          : desktop ?? mobile;
+    (target as HTMLElement | null)?.focus({ preventScroll: true });
+  }
+
   function onSupplierSearchKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     const listOpen =
       supplierFocused && supplierQ.trim().length > 0 && supplierHits.length > 0;
-    if (!listOpen) return;
 
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setSupplierHitHi((h) => {
-        if (supplierHits.length === 0) return -1;
-        if (h < 0) return 0;
-        return Math.min(supplierHits.length - 1, h + 1);
-      });
+    if (listOpen) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSupplierHitHi((h) => {
+          if (supplierHits.length === 0) return -1;
+          if (h < 0) return 0;
+          return Math.min(supplierHits.length - 1, h + 1);
+        });
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSupplierHitHi((h) => {
+          if (supplierHits.length === 0) return -1;
+          if (h < 0) return supplierHits.length - 1;
+          return Math.max(0, h - 1);
+        });
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const i = supplierHitHi >= 0 ? supplierHitHi : 0;
+        const row = supplierHits[i];
+        if (row) handlePickSupplier(row);
+        focusInvoiceNo();
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setSupplierHits([]);
+        setSupplierHitHi(-1);
+      }
       return;
     }
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setSupplierHitHi((h) => {
-        if (supplierHits.length === 0) return -1;
-        if (h < 0) return supplierHits.length - 1;
-        return Math.max(0, h - 1);
-      });
-      return;
-    }
+
     if (e.key === "Enter") {
       e.preventDefault();
-      const i = supplierHitHi >= 0 ? supplierHitHi : 0;
-      const row = supplierHits[i];
-      if (row) handlePickSupplier(row);
-      return;
-    }
-    if (e.key === "Escape") {
-      e.preventDefault();
-      setSupplierHits([]);
-      setSupplierHitHi(-1);
+      focusInvoiceNo();
     }
   }
 
@@ -2040,9 +2066,15 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
             Invoice No <span className="text-red-600 dark:text-red-400" aria-hidden>*</span>
           </span>
           <input
+            ref={invoiceNoRef}
             className="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-2 dark:border-zinc-600 dark:bg-zinc-950"
             value={invoiceNo}
             onChange={(e) => setInvoiceNo(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              invoiceDateRef.current?.focus();
+            }}
             placeholder="e.g. IL-26-1393"
             aria-required={true}
           />
@@ -2052,12 +2084,18 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
             Invoice date <span className="text-red-600 dark:text-red-400" aria-hidden>*</span>
           </span>
           <DatePickerInput
+            ref={invoiceDateRef}
             required
             aria-required={true}
             className="rounded-lg border border-zinc-300 px-2 py-2 dark:border-zinc-600 dark:bg-zinc-950"
             wrapperClassName="mt-1 w-full"
             value={invoiceDate}
             onChange={(e) => setInvoiceDate(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              focusDraftProductSearch();
+            }}
           />
         </label>
       </div>

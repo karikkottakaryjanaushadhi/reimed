@@ -86,6 +86,7 @@ export function PosBillingForm({
   const doctorNameRef = useRef<HTMLInputElement>(null);
   const customerPhoneRef = useRef<HTMLInputElement>(null);
   const paymentModeRef = useRef<HTMLSelectElement>(null);
+  const cashReceivedRef = useRef<HTMLInputElement>(null);
   const paidCheckboxRef = useRef<HTMLInputElement>(null);
   const checkoutBtnRef = useRef<HTMLButtonElement>(null);
   const paidTouchedRef = useRef(false);
@@ -106,6 +107,7 @@ export function PosBillingForm({
   const [customerPhone, setCustomerPhone] = useState("");
   const [doctorName, setDoctorName] = useState("");
   const [paymentMode, setPaymentMode] = useState("CASH");
+  const [cashReceivedInput, setCashReceivedInput] = useState("");
   const [paid, setPaid] = useState(true);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(isEdit);
@@ -125,8 +127,9 @@ export function PosBillingForm({
         doctorName,
         paymentMode,
         paid,
+        cashReceived: cashReceivedInput,
       }),
-    [cart, customerName, customerPhone, doctorName, paymentMode, paid],
+    [cart, customerName, customerPhone, doctorName, paymentMode, paid, cashReceivedInput],
   );
 
   const {
@@ -149,6 +152,7 @@ export function PosBillingForm({
     setDoctorName(d.doctorName);
     setPaymentMode(d.paymentMode);
     setPaid(d.paid ?? defaultSalePaid(d.paymentMode));
+    setCashReceivedInput(d.cashReceived ?? "");
     paidTouchedRef.current = true;
     setDraftKey((k) => k + 1);
     setMsg(null);
@@ -182,6 +186,7 @@ export function PosBillingForm({
           doctorName: string | null;
           paymentMode: string;
           paid: boolean;
+          cashReceived: number | null;
           lines: SaleLoadLine[];
         };
         if (!sale.editable) {
@@ -194,6 +199,11 @@ export function PosBillingForm({
         setDoctorName(isPlaceholderDoctorName(sale.doctorName) ? "" : (sale.doctorName ?? ""));
         setPaymentMode(sale.paymentMode || "CASH");
         setPaid(sale.paid);
+        setCashReceivedInput(
+          sale.cashReceived != null && Number.isFinite(sale.cashReceived)
+            ? String(sale.cashReceived)
+            : "",
+        );
         paidTouchedRef.current = true;
         setCart(
           sale.lines.map((l) => ({
@@ -362,17 +372,38 @@ export function PosBillingForm({
     };
   }, [cart]);
 
+  const cashReceivedAmount = useMemo(() => {
+    const t = cashReceivedInput.trim();
+    if (!t) return null;
+    const n = Number(t);
+    if (!Number.isFinite(n) || n < 0) return null;
+    return round2(n);
+  }, [cashReceivedInput]);
+
+  const cashBalance =
+    paymentMode === "CASH" && cashReceivedAmount != null
+      ? round2(cashReceivedAmount - total)
+      : null;
+
   const checkout = useCallback(async () => {
     const normalizedCart = cart.map(normalizeCartLineQty);
     setCart(normalizedCart);
     setBusy(true);
     setMsg(null);
+    const parsedCash = (() => {
+      const t = cashReceivedInput.trim();
+      if (!t) return null;
+      const n = Number(t);
+      if (!Number.isFinite(n) || n < 0) return null;
+      return round2(n);
+    })();
     const payload = {
       customerName: customerName || undefined,
       customerPhone: customerPhone || undefined,
       doctorName: doctorName || undefined,
       paymentMode,
       paid,
+      cashReceived: paymentMode === "CASH" ? parsedCash : null,
       lines: normalizedCart.map((l) => ({
         productId: l.productId,
         lotId: l.lotId,
@@ -410,12 +441,13 @@ export function PosBillingForm({
       setDoctorName("");
       setPaymentMode("CASH");
       setPaid(true);
+      setCashReceivedInput("");
       paidTouchedRef.current = false;
       clearPosSavedDraft();
     } finally {
       setBusy(false);
     }
-  }, [cart, clearPosSavedDraft, customerName, customerPhone, discountSum, doctorName, editSaleId, isEdit, paid, paymentMode, router, total]);
+  }, [cart, cashReceivedInput, clearPosSavedDraft, customerName, customerPhone, discountSum, doctorName, editSaleId, isEdit, paid, paymentMode, router, total]);
 
   useEffect(() => {
     function onKeyDown(e: globalThis.KeyboardEvent) {
@@ -907,7 +939,21 @@ export function PosBillingForm({
             value={paymentMode}
             onChange={(e) => setPaymentMode(e.target.value)}
             onKeyDown={(e) =>
-              onCustomerFieldEnter(e, () => paidCheckboxRef.current?.focus())
+              onCustomerFieldEnter(e, () => {
+                if (paymentMode === "CASH" || e.currentTarget.value === "CASH") {
+                  // Focus cash field after mode settles; use next tick target from current mode change
+                  const nextMode = (e.target as HTMLSelectElement).value;
+                  if (nextMode === "CASH") {
+                    cashReceivedRef.current?.focus();
+                  } else {
+                    paidCheckboxRef.current?.focus();
+                  }
+                } else if (paymentMode === "CASH") {
+                  cashReceivedRef.current?.focus();
+                } else {
+                  paidCheckboxRef.current?.focus();
+                }
+              })
             }
           >
             <option value="CASH">Cash</option>
@@ -916,6 +962,39 @@ export function PosBillingForm({
             <option value="CREDIT">Credit</option>
           </select>
         </label>
+        {paymentMode === "CASH" ? (
+          <>
+            <label className="text-sm">
+              <span className="text-zinc-500">Cash received</span>
+              <input
+                ref={cashReceivedRef}
+                type="number"
+                min={0}
+                step="0.01"
+                inputMode="decimal"
+                className={POS_CUSTOMER_FIELD_CLASS}
+                value={cashReceivedInput}
+                onChange={(e) => setCashReceivedInput(e.target.value)}
+                onKeyDown={(e) =>
+                  onCustomerFieldEnter(e, () => paidCheckboxRef.current?.focus())
+                }
+              />
+            </label>
+            <div className="text-sm">
+              <span className="text-zinc-500">Balance</span>
+              <div
+                className={`${POS_CUSTOMER_FIELD_CLASS} flex items-center tabular-nums ${
+                  cashBalance != null && cashBalance < 0
+                    ? "text-amber-800 dark:text-amber-200"
+                    : "text-zinc-900 dark:text-zinc-50"
+                }`}
+                aria-live="polite"
+              >
+                {cashBalance != null ? `₹${cashBalance.toFixed(2)}` : "—"}
+              </div>
+            </div>
+          </>
+        ) : null}
         <label className="flex items-end gap-2 text-sm sm:col-span-2 lg:col-span-1">
           <span className="inline-flex w-full items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50/90 px-2.5 py-2 dark:border-zinc-700 dark:bg-zinc-800/50">
             <input

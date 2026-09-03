@@ -76,6 +76,10 @@ export default async function SaleBillViewPage({ params }: { params: Promise<{ i
   );
   const billRoundOff = saleBillRoundOff(billPayable, billGross);
   const netAfterReturns = netSaleTotal(billGross, returnCreditSum);
+  const cashReceived =
+    sale.cashReceived != null ? Number(sale.cashReceived) : null;
+  const cashBalance =
+    cashReceived != null ? Math.round((cashReceived - billGross) * 100) / 100 : null;
   const editable = canEditSale({ createdAt: sale.createdAt, returnCount: returnCountAll });
 
   const lineViews: SaleBillLineView[] = sale.lines.map((line) => {
@@ -212,6 +216,26 @@ export default async function SaleBillViewPage({ params }: { params: Promise<{ i
           <p className="text-zinc-500">Bill total (original)</p>
           <p className="mt-1 text-lg font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">₹{billGross.toFixed(2)}</p>
         </div>
+        {cashReceived != null ? (
+          <>
+            <div>
+              <p className="text-zinc-500">Cash received</p>
+              <p className="mt-1 font-medium tabular-nums text-zinc-900 dark:text-zinc-100">₹{cashReceived.toFixed(2)}</p>
+            </div>
+            <div>
+              <p className="text-zinc-500">Balance</p>
+              <p
+                className={`mt-1 font-medium tabular-nums ${
+                  cashBalance != null && cashBalance < 0
+                    ? "text-amber-800 dark:text-amber-200"
+                    : "text-zinc-900 dark:text-zinc-100"
+                }`}
+              >
+                ₹{(cashBalance ?? 0).toFixed(2)}
+              </p>
+            </div>
+          </>
+        ) : null}
         {returnCreditSum > 0 ? (
           <>
             <div>

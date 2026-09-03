@@ -9,7 +9,7 @@ import {
   randomPlaceholderDoctorName,
 } from "@/lib/sale-placeholders";
 import { posSaleLineInputSchema, resolvePosSaleLinesInTransaction } from "@/lib/sale-checkout-resolve";
-import { defaultSalePaid } from "@/lib/sale-paid";
+import { defaultSalePaid, resolveSaleCashReceived } from "@/lib/sale-paid";
 import { prisma } from "@/lib/prisma";
 import { storeUpper, storeUpperOpt } from "@/lib/store-text";
 
@@ -19,6 +19,7 @@ const patchBodySchema = z.object({
   doctorName: z.string().optional(),
   paymentMode: z.enum(["CASH", "CARD", "UPI", "CREDIT"]).optional(),
   paid: z.boolean().optional(),
+  cashReceived: z.number().nonnegative().nullable().optional(),
   lines: z.array(posSaleLineInputSchema).min(1),
 });
 
@@ -88,6 +89,7 @@ export async function GET(
       netTotal,
       paymentMode: sale.paymentMode,
       paid: sale.paid,
+      cashReceived: sale.cashReceived != null ? Number(sale.cashReceived) : null,
       store: { name: sale.store.name, phone: sale.store.phone, address: sale.store.address, gstin: sale.store.gstin },
       createdByName: sale.createdBy.name,
       lines: sale.lines.map((l) => {
@@ -134,6 +136,7 @@ export async function PATCH(
   const storeId = ctx.activeStoreId;
   const paymentMode = (parsed.data.paymentMode ?? "CASH") as PaymentMode;
   const paid = parsed.data.paid ?? defaultSalePaid(paymentMode);
+  const cashReceived = resolveSaleCashReceived(paymentMode, parsed.data.cashReceived);
 
   const customerName = storeUpper(
     parsed.data.customerName?.trim() || randomPlaceholderCustomerName(),
@@ -191,6 +194,7 @@ export async function PATCH(
           total,
           paymentMode,
           paid,
+          cashReceived,
           lines: {
             create: resolved.map((r) => ({
               productId: r.productId,
