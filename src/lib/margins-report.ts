@@ -141,7 +141,7 @@ export async function loadMarginsReport(storeId: string, sp: MarginsQuery): Prom
         discountAmount: true,
         gstAmount: true,
         product: { select: { id: true, name: true, packSize: true } },
-        lot: { select: { costPrice: true } },
+        lot: { select: { costPrice: true, mrp: true } },
         sale: {
           select: {
             billNo: true,
@@ -164,7 +164,7 @@ export async function loadMarginsReport(storeId: string, sp: MarginsQuery): Prom
             discountAmount: true,
             gstAmount: true,
             product: { select: { id: true, name: true, packSize: true } },
-            lot: { select: { costPrice: true } },
+            lot: { select: { costPrice: true, mrp: true } },
             sale: {
               select: {
                 billNo: true,

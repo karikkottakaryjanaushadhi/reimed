@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-context";
 import { csvResponse } from "@/lib/csv";
 import { formatAppDateYmd } from "@/lib/app-timezone";
+import { formatProductwiseMrp } from "@/lib/productwise-sales-aggregate";
 import { loadProductwiseSalesReport } from "@/lib/productwise-sales-report";
 
 export async function GET(req: Request) {
@@ -34,6 +35,7 @@ export async function GET(req: Request) {
       "Return qty",
       "Remaining qty",
       "Bills",
+      "MRP",
       "Gross",
       "Discount",
       "Returns",
@@ -48,6 +50,7 @@ export async function GET(req: Request) {
       row.returnQty,
       row.remainingQty,
       row.billCount,
+      formatProductwiseMrp(row.mrpMin, row.mrpMax).replace(/^₹/, ""),
       row.gross.toFixed(2),
       row.discount.toFixed(2),
       row.returnCredits.toFixed(2),

@@ -7,7 +7,7 @@ import { MobileFilterSheet } from "@/components/mobile-filter-sheet";
 import { ListPageSizeControls, ListPaginationNav } from "@/components/list-pagination";
 import { getAuthContext } from "@/lib/auth-context";
 import { DEFAULT_LIST_PAGE_SIZE, parseListLimitParam } from "@/lib/list-pagination";
-import { sumProductwiseRows } from "@/lib/productwise-sales-aggregate";
+import { sumProductwiseRows, formatProductwiseMrp } from "@/lib/productwise-sales-aggregate";
 import { loadProductwiseSalesReport } from "@/lib/productwise-sales-report";
 import { getProductwiseProductOptions } from "@/lib/sales-filter-options";
 
@@ -197,6 +197,7 @@ export default async function ProductwiseSalesPage({
           productId: item.productId,
           productName: item.productName,
           supplier: item.supplier,
+          mrpLabel: formatProductwiseMrp(item.mrpMin, item.mrpMax),
           quantity: item.quantity,
           returnQty: item.returnQty,
           remainingQty: item.remainingQty,
@@ -253,6 +254,7 @@ export default async function ProductwiseSalesPage({
                   Bills {sort === "billCount" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
+              <th className="px-4 py-3 text-right">MRP</th>
               <th className="px-4 py-3 text-right">
                 <Link
                   href={buildProductwiseSearchUrl("/dashboard/sales/productwise", 1, pageSize, {
@@ -301,6 +303,9 @@ export default async function ProductwiseSalesPage({
                 </td>
                 <td className="px-4 py-3 tabular-nums text-zinc-600">{item.remainingQty}</td>
                 <td className="px-4 py-3 text-zinc-600">{item.billCount}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-zinc-600">
+                  {formatProductwiseMrp(item.mrpMin, item.mrpMax)}
+                </td>
                 <td className="px-4 py-3 text-right tabular-nums">₹{item.gross.toFixed(2)}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-zinc-600">₹{item.discount.toFixed(2)}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-amber-800 dark:text-amber-200">
@@ -318,6 +323,7 @@ export default async function ProductwiseSalesPage({
                 <td className="px-4 py-3">Total (all products)</td>
                 <td className="px-4 py-3">—</td>
                 <td className="px-4 py-3 tabular-nums">{totals.quantity}</td>
+                <td className="px-4 py-3">—</td>
                 <td className="px-4 py-3">—</td>
                 <td className="px-4 py-3">—</td>
                 <td className="px-4 py-3 text-right tabular-nums">₹{totals.gross.toFixed(2)}</td>

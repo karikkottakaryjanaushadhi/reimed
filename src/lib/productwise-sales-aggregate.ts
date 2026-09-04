@@ -6,6 +6,10 @@ export type ProductwiseRow = {
   productId: string;
   productName: string;
   packSize: number;
+  /** Pack MRP from lots sold in the period (min across lines). */
+  mrpMin: number | null;
+  /** Pack MRP from lots sold in the period (max across lines). */
+  mrpMax: number | null;
   quantity: number;
   returnQty: number;
   gross: number;
@@ -23,6 +27,8 @@ type Agg = {
   productId: string;
   productName: string;
   packSize: number;
+  mrpMin: number | null;
+  mrpMax: number | null;
   quantity: number;
   returnQty: number;
   gross: number;
@@ -41,7 +47,7 @@ type SaleLineRow = {
   discountAmount: unknown;
   gstAmount: unknown;
   product: { id: string; name: string; packSize: unknown };
-  lot: { costPrice: unknown };
+  lot: { costPrice: unknown; mrp: unknown };
 };
 
 type ReturnLineRow = {
@@ -54,9 +60,16 @@ type ReturnLineRow = {
     discountAmount: unknown;
     gstAmount: unknown;
     product: { id: string; name: string; packSize: unknown };
-    lot: { costPrice: unknown };
+    lot: { costPrice: unknown; mrp: unknown };
   };
 };
+
+function noteLotMrp(entry: Agg, rawMrp: unknown) {
+  const mrp = Number(rawMrp);
+  if (!Number.isFinite(mrp) || mrp < 0) return;
+  entry.mrpMin = entry.mrpMin == null ? mrp : Math.min(entry.mrpMin, mrp);
+  entry.mrpMax = entry.mrpMax == null ? mrp : Math.max(entry.mrpMax, mrp);
+}
 
 function ensureAgg(map: Map<string, Agg>, line: { product: { id: string; name: string; packSize: unknown } }): Agg {
   let entry = map.get(line.product.id);
@@ -65,6 +78,8 @@ function ensureAgg(map: Map<string, Agg>, line: { product: { id: string; name: s
       productId: line.product.id,
       productName: line.product.name,
       packSize: Number(line.product.packSize) || 1,
+      mrpMin: null,
+      mrpMax: null,
       quantity: 0,
       returnQty: 0,
       gross: 0,
@@ -88,6 +103,7 @@ function applySaleLine(entry: Agg, line: SaleLineRow) {
   const costAmount = saleLineCostAmount(qty, Number(line.lot.costPrice), entry.packSize);
   const lineMargin = saleLineMarginAmount(amount, discountAmount, gstAmount, costAmount);
 
+  noteLotMrp(entry, line.lot.mrp);
   entry.quantity += qty;
   entry.gross = roundMoney(entry.gross + amount);
   entry.discount = roundMoney(entry.discount + discountAmount);
@@ -113,6 +129,7 @@ function applyReturnLine(entry: Agg, saleLine: ReturnLineRow["saleLine"], return
   const retCost = saleLineCostAmount(returnQty, Number(saleLine.lot.costPrice), entry.packSize);
   const retMargin = saleLineMarginAmount(retAmount, retDiscount, retTax, retCost);
 
+  noteLotMrp(entry, saleLine.lot.mrp);
   entry.quantity -= returnQty;
   entry.returnQty += returnQty;
   entry.gross = roundMoney(entry.gross - retAmount);
@@ -132,6 +149,8 @@ function finalizeRow(entry: Agg): ProductwiseRow {
     productId: entry.productId,
     productName: entry.productName,
     packSize: entry.packSize,
+    mrpMin: entry.mrpMin,
+    mrpMax: entry.mrpMax,
     quantity: entry.quantity,
     returnQty: entry.returnQty,
     gross: entry.gross,
@@ -144,6 +163,12 @@ function finalizeRow(entry: Agg): ProductwiseRow {
     netRevenue,
     marginPercent,
   };
+}
+
+export function formatProductwiseMrp(mrpMin: number | null, mrpMax: number | null): string {
+  if (mrpMin == null || mrpMax == null) return "—";
+  if (mrpMin === mrpMax) return `₹${mrpMin.toFixed(2)}`;
+  return `₹${mrpMin.toFixed(2)}–₹${mrpMax.toFixed(2)}`;
 }
 
 export function aggregateProductwiseSales(

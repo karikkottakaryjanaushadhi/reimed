@@ -30,6 +30,7 @@ const PRODUCTWISE_LINE_SELECT = {
   lot: {
     select: {
       costPrice: true,
+      mrp: true,
     },
   },
 } as const;

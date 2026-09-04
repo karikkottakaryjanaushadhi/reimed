@@ -4,6 +4,7 @@ export type ProductwiseCardRow = {
   productId: string;
   productName: string;
   supplier: string | null;
+  mrpLabel: string;
   quantity: number;
   returnQty: number;
   remainingQty: number;
@@ -71,6 +72,10 @@ export function ProductwiseListMobile({
             <div>
               <dt className="text-xs text-zinc-500">Bills</dt>
               <dd className="tabular-nums">{item.billCount}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-zinc-500">MRP</dt>
+              <dd className="tabular-nums">{item.mrpLabel}</dd>
             </div>
             <div>
               <dt className="text-xs text-zinc-500">Gross</dt>
