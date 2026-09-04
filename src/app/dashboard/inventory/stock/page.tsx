@@ -306,53 +306,53 @@ export default async function InventoryStockPage({
         <StockListMobile stock={stock} brands={brandOptions} canEditBrand={canEditBrand} />
 
         <div className="hidden overflow-x-auto rounded-xl border border-zinc-200 bg-white md:block dark:border-zinc-800 dark:bg-zinc-900">
-          <table className="w-full min-w-[60rem] text-left text-sm">
+          <table className="w-full min-w-[68rem] text-left text-sm">
             <thead className="bg-zinc-50 text-xs uppercase text-zinc-500 dark:bg-zinc-800">
               <tr>
-                <th className="px-4 py-3">
+                <th className="whitespace-nowrap px-4 py-3">
                 <Link
                   href={buildStockUrl(BASE, filters, 1, stockPageSize, "name", sort === "name" && dir === "asc" ? "desc" : "asc")}
-                  className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
+                  className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                 >
                   Product {sort === "name" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
-                <th className="min-w-[10rem] px-4 py-3">
+                <th className="min-w-[10rem] whitespace-nowrap px-4 py-3">
                   <Link
                     href={buildStockUrl(BASE, filters, 1, stockPageSize, "brand", sort === "brand" && dir === "asc" ? "desc" : "asc")}
-                    className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
+                    className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                   >
                     Brand {sort === "brand" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                   </Link>
                 </th>
-                <th className="min-w-[7rem] px-4 py-3">
+                <th className="min-w-[7rem] whitespace-nowrap px-4 py-3">
                   <Link
                     href={buildStockUrl(BASE, filters, 1, stockPageSize, "productCategory", sort === "productCategory" && dir === "asc" ? "desc" : "asc")}
-                    className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
+                    className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                   >
                     Category {sort === "productCategory" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                   </Link>
                 </th>
-                <th className="min-w-[7rem] px-4 py-3">
+                <th className="min-w-[7rem] whitespace-nowrap px-4 py-3">
                   <Link
                     href={buildStockUrl(BASE, filters, 1, stockPageSize, "productType", sort === "productType" && dir === "asc" ? "desc" : "asc")}
-                    className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
+                    className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                   >
                     Type {sort === "productType" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                   </Link>
                 </th>
-                <th className="min-w-[6rem] px-4 py-3">
+                <th className="min-w-[6rem] whitespace-nowrap px-4 py-3">
                   <Link
                     href={buildStockUrl(BASE, filters, 1, stockPageSize, "gstPct", sort === "gstPct" && dir === "asc" ? "desc" : "asc")}
-                    className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
+                    className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                   >
                     GST % {sort === "gstPct" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                   </Link>
                 </th>
-                <th className="min-w-[8rem] px-4 py-3">
+                <th className="min-w-[8rem] whitespace-nowrap px-4 py-3">
                   <Link
                     href={buildStockUrl(BASE, filters, 1, stockPageSize, "supplier", sort === "supplier" && dir === "asc" ? "desc" : "asc")}
-                    className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
+                    className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                   >
                     Supplier {sort === "supplier" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                   </Link>
@@ -360,7 +360,7 @@ export default async function InventoryStockPage({
                 <th className="whitespace-nowrap px-4 py-3 text-right">
                   <Link
                     href={buildStockUrl(BASE, filters, 1, stockPageSize, "qty", sort === "qty" && dir === "asc" ? "desc" : "asc")}
-                    className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
+                    className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                   >
                     Qty {sort === "qty" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                   </Link>
@@ -368,7 +368,7 @@ export default async function InventoryStockPage({
                 <th className="whitespace-nowrap px-4 py-3 text-right">
                   <Link
                     href={buildStockUrl(BASE, filters, 1, stockPageSize, "reorderMin", sort === "reorderMin" && dir === "asc" ? "desc" : "asc")}
-                    className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
+                    className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                   >
                     Reorder {sort === "reorderMin" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                   </Link>

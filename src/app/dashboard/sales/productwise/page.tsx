@@ -213,76 +213,76 @@ export default async function ProductwiseSalesPage({
       />
 
       <div className="hidden overflow-x-auto rounded-xl border border-zinc-200 bg-white md:block dark:border-zinc-800 dark:bg-zinc-900">
-        <table className="w-full min-w-full text-left text-sm">
+        <table className="w-full min-w-[72rem] text-left text-sm">
           <thead className="bg-zinc-50 text-xs uppercase text-zinc-500 dark:bg-zinc-800">
             <tr>
-              <th className="px-4 py-3">
+              <th className="whitespace-nowrap px-4 py-3">
                 <Link
                   href={buildProductwiseSearchUrl("/dashboard/sales/productwise", 1, pageSize, {
                     ...extras,
                     sort: "name",
                     dir: sort === "name" && dir === "asc" ? "desc" : "asc",
                   })}
-                  className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
+                  className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                 >
                   Product {sort === "name" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
-              <th className="min-w-[8rem] px-4 py-3">Supplier</th>
-              <th className="px-4 py-3">
+              <th className="min-w-[8rem] whitespace-nowrap px-4 py-3">Supplier</th>
+              <th className="whitespace-nowrap px-4 py-3">
                 <Link
                   href={buildProductwiseSearchUrl("/dashboard/sales/productwise", 1, pageSize, {
                     ...extras,
                     sort: "quantity",
                     dir: sort === "quantity" && dir === "asc" ? "desc" : "asc",
                   })}
-                  className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
+                  className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                 >
                   Net qty {sort === "quantity" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
-              <th className="px-4 py-3">Remaining qty</th>
-              <th className="px-4 py-3">
+              <th className="whitespace-nowrap px-4 py-3">Remaining qty</th>
+              <th className="whitespace-nowrap px-4 py-3">
                 <Link
                   href={buildProductwiseSearchUrl("/dashboard/sales/productwise", 1, pageSize, {
                     ...extras,
                     sort: "billCount",
                     dir: sort === "billCount" && dir === "asc" ? "desc" : "asc",
                   })}
-                  className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
+                  className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                 >
                   Bills {sort === "billCount" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
-              <th className="px-4 py-3 text-right">MRP</th>
-              <th className="px-4 py-3 text-right">
+              <th className="whitespace-nowrap px-4 py-3 text-right">MRP</th>
+              <th className="whitespace-nowrap px-4 py-3 text-right">
                 <Link
                   href={buildProductwiseSearchUrl("/dashboard/sales/productwise", 1, pageSize, {
                     ...extras,
                     sort: "gross",
                     dir: sort === "gross" && dir === "asc" ? "desc" : "asc",
                   })}
-                  className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
+                  className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                 >
                   Gross ₹ {sort === "gross" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
-              <th className="px-4 py-3 text-right">Discount</th>
-              <th className="px-4 py-3 text-right">
+              <th className="whitespace-nowrap px-4 py-3 text-right">Discount</th>
+              <th className="whitespace-nowrap px-4 py-3 text-right">
                 <Link
                   href={buildProductwiseSearchUrl("/dashboard/sales/productwise", 1, pageSize, {
                     ...extras,
                     sort: "returnCredits",
                     dir: sort === "returnCredits" && dir === "asc" ? "desc" : "asc",
                   })}
-                  className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
+                  className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                 >
                   Returns ₹ {sort === "returnCredits" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
-              <th className="px-4 py-3 text-right">Net ₹</th>
-              <th className="px-4 py-3 text-right">Tax</th>
-              <th className="px-4 py-3 text-right">Cost</th>
+              <th className="whitespace-nowrap px-4 py-3 text-right">Net ₹</th>
+              <th className="whitespace-nowrap px-4 py-3 text-right">Tax</th>
+              <th className="whitespace-nowrap px-4 py-3 text-right">Cost</th>
             </tr>
           </thead>
           <tbody>
