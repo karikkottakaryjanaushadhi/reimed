@@ -276,7 +276,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
   /** Checked = still editing after post (purchase stays open on detail). Uncheck before posting to finalize at once. */
   const [editingInProgress, setEditingInProgress] = useState(true);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("CASH");
-  const [billPaid, setBillPaid] = useState(true);
+  const [billPaid, setBillPaid] = useState(false);
   const [paidAt, setPaidAt] = useState(todayPaidAtYmd());
   const [paymentRefLast4, setPaymentRefLast4] = useState("");
   const [draftHitHi, setDraftHitHi] = useState(0);
@@ -344,7 +344,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
     setDraftNewProduct(d.draftNewProduct);
     setEditingInProgress(d.editingInProgress);
     setPaymentMode(d.paymentMode ?? "CASH");
-    setBillPaid(d.billPaid ?? defaultPurchasePaid(d.paymentMode ?? "CASH"));
+    setBillPaid(d.billPaid ?? false);
     setPaidAt(d.paidAt || todayPaidAtYmd());
     setPaymentRefLast4(d.paymentRefLast4 ?? "");
     setImportMetaNotes(d.importMetaNotes);
@@ -1214,7 +1214,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
       setImportMetaNotes("");
       setEditingInProgress(true);
       setPaymentMode("CASH");
-      setBillPaid(true);
+      setBillPaid(false);
       setPaidAt(todayPaidAtYmd());
       setPaymentRefLast4("");
       setInvoiceNo("");
@@ -2241,10 +2241,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
               onChange={(e) => {
                 const mode = e.target.value as PaymentMode;
                 setPaymentMode(mode);
-                const nextPaid = defaultPurchasePaid(mode);
-                setBillPaid(nextPaid);
                 if (!paymentRefApplies(mode)) setPaymentRefLast4("");
-                if (nextPaid && !paidAt) setPaidAt(todayPaidAtYmd());
               }}
             >
               <option value="CASH">Cash</option>
@@ -2253,20 +2250,39 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
               <option value="CREDIT">Credit</option>
             </select>
           </label>
-          <label className="flex items-end gap-2 pb-1 text-sm">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-zinc-300"
-              checked={billPaid}
-              disabled={busy}
-              onChange={(e) => {
-                const next = e.target.checked;
-                setBillPaid(next);
-                if (next && !paidAt) setPaidAt(todayPaidAtYmd());
-                if (!next) setPaymentRefLast4("");
-              }}
-            />
-            <span className="font-medium text-zinc-800 dark:text-zinc-200">Bill paid</span>
+          <label
+            className={`inline-flex w-fit items-end gap-2 self-end rounded-lg border px-2.5 py-1.5 ${
+              billPaid
+                ? "border-emerald-200 bg-emerald-50/90 dark:border-emerald-900 dark:bg-emerald-950/40"
+                : "border-amber-200 bg-amber-50/90 dark:border-amber-900 dark:bg-amber-950/40"
+            } ${busy ? "cursor-wait opacity-60" : "cursor-pointer"}`}
+          >
+            <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">Bill paid</span>
+            <span className="relative inline-flex h-5 w-9 shrink-0 self-center">
+              <input
+                type="checkbox"
+                role="switch"
+                className="peer sr-only"
+                checked={billPaid}
+                disabled={busy}
+                aria-checked={billPaid}
+                aria-label={billPaid ? "Bill paid" : "Bill unpaid"}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setBillPaid(next);
+                  if (next && !paidAt) setPaidAt(todayPaidAtYmd());
+                  if (!next) setPaymentRefLast4("");
+                }}
+              />
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 z-0 rounded-full bg-zinc-300 transition-colors peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-blue peer-checked:bg-gradient-to-r peer-checked:from-brand-blue peer-checked:to-brand-green dark:bg-zinc-600"
+              />
+              <span
+                aria-hidden
+                className="pointer-events-none absolute left-0.5 top-0.5 z-10 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ease-out peer-checked:translate-x-4 dark:bg-zinc-100"
+              />
+            </span>
           </label>
           {billPaid ? (
             <>

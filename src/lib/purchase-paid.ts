@@ -8,8 +8,8 @@ export function isPurchasePaymentMode(v: string): v is PaymentMode {
 }
 
 /** Default paid state when creating a purchase from payment mode. */
-export function defaultPurchasePaid(paymentMode: PaymentMode | string): boolean {
-  return paymentMode !== "CREDIT";
+export function defaultPurchasePaid(_paymentMode?: PaymentMode | string): boolean {
+  return false;
 }
 
 /** UPI / Card use txn last-4; cash and credit do not. */
