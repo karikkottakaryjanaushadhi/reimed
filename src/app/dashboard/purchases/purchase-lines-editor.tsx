@@ -78,6 +78,8 @@ export type PurchaseLineDraft = {
   salesDiscountPct: number;
   salesDiscountRs: number;
   gstPct: number;
+  /** Trade units already returned to supplier (view purchase). */
+  returnedQty?: number;
   /** Set when line was added as a new catalog product (local row before save). */
   catalogBrandId?: string | null;
   catalogReorderMin?: number;
@@ -782,6 +784,7 @@ export const PurchaseLinesEditor = forwardRef<
               onPatch={(patch) => patchRow(id, patch)}
               disabled={tableBusy}
               index={slNo + 1}
+              returnedQty={row.returnedQty}
               product={
                 <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50" title={row.productName}>
                   {row.productName}
@@ -949,6 +952,14 @@ export const PurchaseLinesEditor = forwardRef<
               >
                 Sum
               </th>
+              {disabled ? (
+                <th
+                  className={`${compactIntCol} px-0.5 py-1.5 text-right`}
+                  title="Trade quantity already returned to supplier"
+                >
+                  Ret.
+                </th>
+              ) : null}
               {!disabled ? <th className={`${actionCol} px-0.5 py-1.5 text-center`} aria-label="Add or remove" /> : null}
             </tr>
           </thead>
@@ -1197,6 +1208,15 @@ export const PurchaseLinesEditor = forwardRef<
                   >
                     ₹{lineSum.toFixed(2)}
                   </td>
+                  {disabled ? (
+                    <td
+                      data-label="Ret."
+                      className={`${compactIntCol} align-middle px-0.5 py-1.5 text-right text-xs tabular-nums text-zinc-500`}
+                      title="Trade quantity already returned to supplier"
+                    >
+                      {(row.returnedQty ?? 0) > 0 ? row.returnedQty : "—"}
+                    </td>
+                  ) : null}
                   {!disabled ? (
                     <td className={`${actionCol} align-middle px-0.5 py-1.5 text-center`}>
                       <button

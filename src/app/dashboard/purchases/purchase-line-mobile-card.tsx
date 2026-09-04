@@ -89,6 +89,8 @@ export type PurchaseLineMobileCardProps = {
   isDraft?: boolean;
   /** Serial number for committed items. */
   index?: number;
+  /** Trade units already returned (view purchase). */
+  returnedQty?: number;
   /** Product header — name, search, badges. */
   product: ReactNode;
   /** Remove / Add button. */
@@ -104,6 +106,7 @@ export function PurchaseLineMobileCard({
   disabled = false,
   isDraft = false,
   index,
+  returnedQty = 0,
   product,
   action,
   className = "",
@@ -312,6 +315,12 @@ export function PurchaseLineMobileCard({
             {marginPct != null ? `${marginPct.toFixed(1)}%` : "—"}
           </p>
         </div>
+        {returnedQty > 0 ? (
+          <div>
+            <p className="text-[11px] leading-tight text-zinc-500">Returned qty</p>
+            <p className="tabular-nums text-zinc-600 dark:text-zinc-400">{returnedQty}</p>
+          </div>
+        ) : null}
         <div className="text-right">
           <p className="text-[11px] leading-tight text-zinc-500">Item total</p>
           <p className="font-medium tabular-nums text-zinc-900 dark:text-zinc-50">

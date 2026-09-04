@@ -100,6 +100,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
     salesDiscountPct: Number(line.salesDiscountPct),
     salesDiscountRs: Number(line.salesDiscountRs),
     gstPct: snapProductGstPct(line.gstPct),
+    returnedQty: returnedByLine.get(line.id) ?? 0,
   }));
 
   const lockedByReturns = priorReturns.length > 0;
