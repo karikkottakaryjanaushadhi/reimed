@@ -35,6 +35,7 @@ import {
 } from "../inventory-batch-table";
 
 const BASE = "/dashboard/inventory/batches";
+const EXPORT_BASE = "/api/dashboard/inventory/batches/export";
 
 type BatchFilters = {
   q: string;
@@ -78,11 +79,17 @@ function buildBatchUrl(
   blimit: number,
   sort: string,
   dir: string,
+  base: string = BASE,
 ): string {
   const p = new URLSearchParams(batchPaginationHidden(filters, blimit, sort, dir));
   if (bpage > 1) p.set("bpage", String(bpage));
+  // Export ignores page size; omit blimit so the link stays filter-focused.
+  if (base === EXPORT_BASE) {
+    p.delete("blimit");
+    p.delete("bpage");
+  }
   const s = p.toString();
-  return s ? `${BASE}?${s}` : BASE;
+  return s ? `${base}?${s}` : base;
 }
 
 function BatchPageSizeControls({
@@ -542,6 +549,8 @@ export default async function InventoryBatchesPage({
   if (hasActiveExpiryFilter(expiryPreset, expiryOnFilter)) activeFilterCount += 1;
   if (lowStockOnly) activeFilterCount += 1;
 
+  const exportHref = buildBatchUrl(filters, 1, DEFAULT_LIST_PAGE_SIZE, sort, dir, EXPORT_BASE);
+
   return (
     <div className="space-y-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -563,6 +572,7 @@ export default async function InventoryBatchesPage({
             sort,
             dir,
           )}
+          exportHref={exportHref}
           hiddenFields={
             <>
               {batchPageSize !== DEFAULT_LIST_PAGE_SIZE ? <input type="hidden" name="blimit" value={batchPageSize} /> : null}

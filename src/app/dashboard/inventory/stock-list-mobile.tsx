@@ -4,6 +4,7 @@ import { StockBrandSelect } from "./stock-brand-select";
 import { StockCategorySelect } from "./stock-category-select";
 import { StockGstSelect } from "./stock-gst-select";
 import { StockProductNameField } from "./stock-product-name-field";
+import { StockTypeSelect } from "./stock-type-select";
 
 export type StockListCardRow = {
   productId: string;
@@ -11,6 +12,7 @@ export type StockListCardRow = {
   brandId: string | null;
   brandName: string | null;
   productCategory: string | null;
+  productType: string | null;
   gstPct: number;
   supplier: string | null;
   qty: number;
@@ -64,6 +66,14 @@ export function StockListMobile({
                   <StockCategorySelect
                     productId={s.productId}
                     productCategory={s.productCategory}
+                    canEdit={canEditBrand}
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Type</p>
+                  <StockTypeSelect
+                    productId={s.productId}
+                    productType={s.productType}
                     canEdit={canEditBrand}
                   />
                 </div>

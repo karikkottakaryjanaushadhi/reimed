@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Prisma } from "@prisma/client";
 import { ListPaginationNav } from "@/components/list-pagination";
 import { getAuthContext, isManager } from "@/lib/auth-context";
 import {
@@ -11,19 +10,18 @@ import {
   parseListLimitParam,
 } from "@/lib/list-pagination";
 import { getInventoryFilterOptions } from "@/lib/inventory-filter-options";
-import { prisma } from "@/lib/prisma";
 import {
-  EXPIRY_SOON_LABEL,
   hasActiveExpiryFilter,
-  inventoryLotExpiryAndClause,
   resolveExpiryFilter,
 } from "@/lib/inventory-expiry-filter";
-import {
-  inventoryLotSearchAndClause,
-  parseInventorySearch,
-} from "@/lib/inventory-stock-expiry-search";
 import { getBrandOptions } from "@/lib/brand-options";
-import { gstPctNumber } from "@/lib/product-gst-slabs";
+import {
+  countStockLevels,
+  parseStockLevelsDir,
+  parseStockLevelsSort,
+  queryStockLevels,
+  resolveStockLevelsFilters,
+} from "@/lib/stock-levels-list-query";
 import { InventoryFiltersForm } from "@/components/inventory-filters-form";
 import { MobileFilterSheet } from "@/components/mobile-filter-sheet";
 import { StockBrandSelect } from "../stock-brand-select";
@@ -31,8 +29,10 @@ import { StockCategorySelect } from "../stock-category-select";
 import { StockGstSelect } from "../stock-gst-select";
 import { StockListMobile } from "../stock-list-mobile";
 import { StockProductNameField } from "../stock-product-name-field";
+import { StockTypeSelect } from "../stock-type-select";
 
 const BASE = "/dashboard/inventory/stock";
+const EXPORT_BASE = "/api/dashboard/inventory/stock/export";
 
 type StockFilters = {
   q: string;
@@ -63,6 +63,7 @@ function stockPaginationHidden(
 }
 
 function buildStockUrl(
+  base: string,
   filters: StockFilters,
   spage: number,
   slimit: number,
@@ -72,7 +73,7 @@ function buildStockUrl(
   const p = new URLSearchParams(stockPaginationHidden(filters, slimit, sort, dir));
   if (spage > 1) p.set("spage", String(spage));
   const s = p.toString();
-  return s ? `${BASE}?${s}` : BASE;
+  return s ? `${base}?${s}` : base;
 }
 
 function StockPageSizeControls({
@@ -101,7 +102,7 @@ function StockPageSizeControls({
           return (
             <Link
               key={n}
-              href={buildStockUrl(filters, 1, n, sort, dir)}
+              href={buildStockUrl(BASE, filters, 1, n, sort, dir)}
               scroll={false}
               className={`rounded-md px-2 py-1 font-medium ${
                 active
@@ -151,13 +152,6 @@ function StockPageSizeControls({
   );
 }
 
-function toCount(n: unknown): number {
-  if (typeof n === "bigint") return Number(n);
-  if (typeof n === "number" && Number.isFinite(n)) return n;
-  const x = Number(n);
-  return Number.isFinite(x) ? x : 0;
-}
-
 export default async function InventoryStockPage({
   searchParams,
 }: {
@@ -180,33 +174,45 @@ export default async function InventoryStockPage({
   const canEditBrand = isManager(ctx);
 
   const sp = await searchParams;
-  const q = typeof sp.q === "string" ? sp.q : "";
-  const sort =
-    sp.sort === "brand" ||
-    sp.sort === "productCategory" ||
-    sp.sort === "gstPct" ||
-    sp.sort === "supplier" ||
-    sp.sort === "qty" ||
-    sp.sort === "reorderMin"
-      ? sp.sort
-      : "name";
-  const dir = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : "asc";
+  const sort = parseStockLevelsSort(sp.sort);
+  const dir = parseStockLevelsDir(sp.dir);
   const rawSpage = Math.max(1, parseInt(String(sp.spage ?? "1"), 10) || 1);
-  const rawSupplierId = typeof sp.supplierId === "string" ? sp.supplierId.trim() : "";
-  const rawBrandId = typeof sp.brandId === "string" ? sp.brandId.trim() : "";
   const expiryRaw = typeof sp.expiry === "string" ? sp.expiry : "";
   const expiryOnRaw = typeof sp.expiryOn === "string" ? sp.expiryOn : "";
-  const { preset: expiryPreset, expiryOnYmd: expiryOnFilter } = resolveExpiryFilter(expiryRaw, expiryOnRaw);
   const lowStockOnly = sp.lowStock === "1";
   const stockPageSize = parseListLimitParam(sp.slimit);
 
   const storeId = ctx.activeStoreId;
 
+  const resolvedFilters = await resolveStockLevelsFilters({
+    storeId,
+    q: typeof sp.q === "string" ? sp.q : "",
+    supplierId: typeof sp.supplierId === "string" ? sp.supplierId : "",
+    brandId: typeof sp.brandId === "string" ? sp.brandId : "",
+    expiry: expiryRaw,
+    expiryOn: expiryOnRaw,
+    lowStock: lowStockOnly,
+  });
+
+  const { preset: expiryPreset, expiryOnYmd: expiryOnFilter } = resolveExpiryFilter(
+    resolvedFilters.expiry,
+    resolvedFilters.expiryOn,
+  );
+
+  const filters: StockFilters = {
+    q: resolvedFilters.q,
+    supplierId: resolvedFilters.supplierId,
+    brandId: resolvedFilters.brandId,
+    expiry: expiryPreset,
+    expiryOn: expiryOnFilter,
+    lowStock: resolvedFilters.lowStock,
+  };
+
   const filterOptions = await getInventoryFilterOptions({
     storeId,
-    q,
-    supplierId: rawSupplierId,
-    brandId: rawBrandId,
+    q: filters.q,
+    supplierId: filters.supplierId,
+    brandId: filters.brandId,
     expiry: expiryRaw,
     expiryOn: expiryOnRaw,
     lowStock: lowStockOnly,
@@ -214,160 +220,36 @@ export default async function InventoryStockPage({
 
   const brandOptions = await getBrandOptions();
 
-  let supplierFilterId = "";
-  if (rawSupplierId) {
-    const match = filterOptions.suppliers.find((s) => s.id === rawSupplierId);
-    if (match) supplierFilterId = match.id;
-    else {
-      const exists = await prisma.supplier.findFirst({
-        where: { id: rawSupplierId, inventoryLots: { some: { storeId } } },
-        select: { id: true },
-      });
-      if (exists) supplierFilterId = rawSupplierId;
-    }
-  }
-
-  let brandFilterId = "";
-  if (rawBrandId) {
-    const match = filterOptions.brands.find((b) => b.id === rawBrandId);
-    if (match) brandFilterId = match.id;
-    else {
-      const exists = await prisma.brand.findFirst({
-        where: { id: rawBrandId },
-        select: { id: true },
-      });
-      if (exists) brandFilterId = rawBrandId;
-    }
-  }
-
-  const supplierClause = supplierFilterId
-    ? Prisma.sql`AND il."supplierId" = ${supplierFilterId}`
-    : Prisma.sql``;
-  const brandClause = brandFilterId ? Prisma.sql`AND p."brandId" = ${brandFilterId}` : Prisma.sql``;
-  const expiryClause = inventoryLotExpiryAndClause({
-    preset: expiryPreset,
-    expiryOnYmd: expiryOnFilter,
-  });
-  const lowStockHavingClause = lowStockOnly
-    ? Prisma.sql`HAVING COALESCE(SUM(il."quantity"), 0) <= p."reorderMin"`
-    : Prisma.sql``;
-
-  const search = parseInventorySearch(q);
-  const searchClause = search ? inventoryLotSearchAndClause(search) : Prisma.sql``;
-
-  const filters: StockFilters = {
-    q,
-    supplierId: supplierFilterId,
-    brandId: brandFilterId,
-    expiry: expiryPreset,
-    expiryOn: expiryOnFilter,
-    lowStock: lowStockOnly,
-  };
-
-  const [stockGroupCountRow] = await prisma.$queryRaw<Array<{ c: unknown }>>(
-    Prisma.sql`
-      SELECT COUNT(*) AS c FROM (
-        SELECT p."id"
-        FROM "InventoryLot" il
-        INNER JOIN "Product" p ON p."id" = il."productId"
-        WHERE il."storeId" = ${storeId} AND il."quantity" >= 0
-        ${searchClause}
-        ${supplierClause}
-        ${brandClause}
-        ${expiryClause}
-        GROUP BY p."id", p."reorderMin"
-        ${lowStockHavingClause}
-      ) t
-    `,
-  );
-  const stockProductTotal = toCount(stockGroupCountRow?.c);
+  const stockProductTotal = await countStockLevels(storeId, resolvedFilters);
   const totalStockPages = Math.max(1, Math.ceil(stockProductTotal / stockPageSize));
   const spage = Math.min(rawSpage, totalStockPages);
   const stockSkip = (spage - 1) * stockPageSize;
 
-  function stockSortOrder(sort: string, dir: "asc" | "desc") {
-    const tiebreak = Prisma.sql`, p."name" ASC, p."id" ASC`;
-    switch (sort) {
-      case "brand":
-        return Prisma.sql`COALESCE(MAX(b."name"), '') ${Prisma.raw(dir)}${tiebreak}`;
-      case "productCategory":
-        return Prisma.sql`p."productCategory" ${Prisma.raw(dir)}${tiebreak}`;
-      case "gstPct":
-        return Prisma.sql`p."gstPct" ${Prisma.raw(dir)}${tiebreak}`;
-      case "supplier":
-        return Prisma.sql`COALESCE(string_agg(DISTINCT s."name", ', '), '') ${Prisma.raw(dir)}${tiebreak}`;
-      case "qty":
-        return Prisma.sql`COALESCE(SUM(il."quantity"), 0) ${Prisma.raw(dir)}${tiebreak}`;
-      case "reorderMin":
-        return Prisma.sql`p."reorderMin" ${Prisma.raw(dir)}${tiebreak}`;
-      case "name":
-      default:
-        return Prisma.sql`p."name" ${Prisma.raw(dir)}, p."id" ASC`;
-    }
-  }
-
-  const stockAggRows = await prisma.$queryRaw<
-    Array<{
-      productId: string;
-      name: string;
-      reorderMin: unknown;
-      qty: unknown;
-      suppliers: string | null;
-      brandId: string | null;
-      brandName: string | null;
-      productCategory: string;
-      gstPct: unknown;
-    }>
-  >(
-    Prisma.sql`
-      SELECT p."id" AS "productId", p."name" AS "name", p."reorderMin" AS "reorderMin",
-             p."brandId" AS "brandId",
-             MAX(b."name") AS "brandName",
-             p."productCategory" AS "productCategory",
-             p."gstPct" AS "gstPct",
-             COALESCE(SUM(il."quantity"), 0) AS "qty",
-             NULLIF(string_agg(DISTINCT s."name", ', '), '') AS "suppliers"
-      FROM "InventoryLot" il
-      INNER JOIN "Product" p ON p."id" = il."productId"
-      LEFT JOIN "Brand" b ON b."id" = p."brandId"
-      LEFT JOIN "Supplier" s ON s."id" = il."supplierId"
-      WHERE il."storeId" = ${storeId} AND il."quantity" >= 0
-      ${searchClause}
-      ${supplierClause}
-      ${brandClause}
-      ${expiryClause}
-      GROUP BY p."id", p."name", p."reorderMin", p."brandId", p."productCategory", p."gstPct"
-      ${lowStockHavingClause}
-      ORDER BY ${stockSortOrder(sort, dir)}
-      LIMIT ${stockPageSize} OFFSET ${stockSkip}
-    `,
-  );
-  const stock = stockAggRows.map((r) => ({
-    productId: r.productId,
-    name: r.name,
-    brandId: r.brandId,
-    brandName: r.brandName?.trim() || null,
-    productCategory: r.productCategory,
-    gstPct: gstPctNumber(r.gstPct),
-    reorderMin: toCount(r.reorderMin),
-    qty: toCount(r.qty),
-    supplier: r.suppliers?.trim() || null,
-  }));
+  const stock = await queryStockLevels({
+    storeId,
+    filters: resolvedFilters,
+    sort,
+    dir,
+    limit: stockPageSize,
+    offset: stockSkip,
+  });
 
   const toBatches = new URLSearchParams();
-  if (q.trim()) toBatches.set("q", q.trim());
-  if (supplierFilterId) toBatches.set("supplierId", supplierFilterId);
-  if (brandFilterId) toBatches.set("brandId", brandFilterId);
+  if (filters.q.trim()) toBatches.set("q", filters.q.trim());
+  if (filters.supplierId) toBatches.set("supplierId", filters.supplierId);
+  if (filters.brandId) toBatches.set("brandId", filters.brandId);
   if (expiryOnFilter) toBatches.set("expiryOn", expiryOnFilter);
   else if (expiryPreset) toBatches.set("expiry", expiryPreset);
   if (lowStockOnly) toBatches.set("lowStock", "1");
   const batchesHref =
     toBatches.toString().length > 0 ? `/dashboard/inventory/batches?${toBatches}` : "/dashboard/inventory/batches";
 
+  const exportHref = buildStockUrl(EXPORT_BASE, filters, 1, DEFAULT_LIST_PAGE_SIZE, sort, dir);
+
   let activeFilterCount = 0;
-  if (q.trim()) activeFilterCount += 1;
-  if (supplierFilterId) activeFilterCount += 1;
-  if (brandFilterId) activeFilterCount += 1;
+  if (filters.q.trim()) activeFilterCount += 1;
+  if (filters.supplierId) activeFilterCount += 1;
+  if (filters.brandId) activeFilterCount += 1;
   if (hasActiveExpiryFilter(expiryPreset, expiryOnFilter)) activeFilterCount += 1;
   if (lowStockOnly) activeFilterCount += 1;
 
@@ -386,12 +268,14 @@ export default async function InventoryStockPage({
           filters={filters}
           initialOptions={filterOptions}
           clearHref={buildStockUrl(
+            BASE,
             { q: "", supplierId: "", brandId: "", expiry: "", expiryOn: "", lowStock: false },
             1,
             stockPageSize,
             sort,
             dir,
           )}
+          exportHref={exportHref}
           hiddenFields={
             <>
               {stockPageSize !== DEFAULT_LIST_PAGE_SIZE ? <input type="hidden" name="slimit" value={stockPageSize} /> : null}
@@ -405,7 +289,7 @@ export default async function InventoryStockPage({
       <section>
         <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-zinc-500">
           Stock levels
-          {supplierFilterId ? (
+          {filters.supplierId ? (
             <span className="ml-2 font-normal normal-case text-zinc-500">
               (quantities from selected supplier only)
             </span>
@@ -427,7 +311,7 @@ export default async function InventoryStockPage({
               <tr>
                 <th className="px-4 py-3">
                 <Link
-                  href={buildStockUrl(filters, 1, stockPageSize, "name", sort === "name" && dir === "asc" ? "desc" : "asc")}
+                  href={buildStockUrl(BASE, filters, 1, stockPageSize, "name", sort === "name" && dir === "asc" ? "desc" : "asc")}
                   className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                 >
                   Product {sort === "name" ? (dir === "asc" ? "↑" : "↓") : "↕"}
@@ -435,7 +319,7 @@ export default async function InventoryStockPage({
               </th>
                 <th className="min-w-[10rem] px-4 py-3">
                   <Link
-                    href={buildStockUrl(filters, 1, stockPageSize, "brand", sort === "brand" && dir === "asc" ? "desc" : "asc")}
+                    href={buildStockUrl(BASE, filters, 1, stockPageSize, "brand", sort === "brand" && dir === "asc" ? "desc" : "asc")}
                     className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                   >
                     Brand {sort === "brand" ? (dir === "asc" ? "↑" : "↓") : "↕"}
@@ -443,15 +327,23 @@ export default async function InventoryStockPage({
                 </th>
                 <th className="min-w-[7rem] px-4 py-3">
                   <Link
-                    href={buildStockUrl(filters, 1, stockPageSize, "productCategory", sort === "productCategory" && dir === "asc" ? "desc" : "asc")}
+                    href={buildStockUrl(BASE, filters, 1, stockPageSize, "productCategory", sort === "productCategory" && dir === "asc" ? "desc" : "asc")}
                     className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                   >
                     Category {sort === "productCategory" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                   </Link>
                 </th>
+                <th className="min-w-[7rem] px-4 py-3">
+                  <Link
+                    href={buildStockUrl(BASE, filters, 1, stockPageSize, "productType", sort === "productType" && dir === "asc" ? "desc" : "asc")}
+                    className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
+                  >
+                    Type {sort === "productType" ? (dir === "asc" ? "↑" : "↓") : "↕"}
+                  </Link>
+                </th>
                 <th className="min-w-[6rem] px-4 py-3">
                   <Link
-                    href={buildStockUrl(filters, 1, stockPageSize, "gstPct", sort === "gstPct" && dir === "asc" ? "desc" : "asc")}
+                    href={buildStockUrl(BASE, filters, 1, stockPageSize, "gstPct", sort === "gstPct" && dir === "asc" ? "desc" : "asc")}
                     className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                   >
                     GST % {sort === "gstPct" ? (dir === "asc" ? "↑" : "↓") : "↕"}
@@ -459,7 +351,7 @@ export default async function InventoryStockPage({
                 </th>
                 <th className="min-w-[8rem] px-4 py-3">
                   <Link
-                    href={buildStockUrl(filters, 1, stockPageSize, "supplier", sort === "supplier" && dir === "asc" ? "desc" : "asc")}
+                    href={buildStockUrl(BASE, filters, 1, stockPageSize, "supplier", sort === "supplier" && dir === "asc" ? "desc" : "asc")}
                     className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                   >
                     Supplier {sort === "supplier" ? (dir === "asc" ? "↑" : "↓") : "↕"}
@@ -467,7 +359,7 @@ export default async function InventoryStockPage({
                 </th>
                 <th className="whitespace-nowrap px-4 py-3 text-right">
                   <Link
-                    href={buildStockUrl(filters, 1, stockPageSize, "qty", sort === "qty" && dir === "asc" ? "desc" : "asc")}
+                    href={buildStockUrl(BASE, filters, 1, stockPageSize, "qty", sort === "qty" && dir === "asc" ? "desc" : "asc")}
                     className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                   >
                     Qty {sort === "qty" ? (dir === "asc" ? "↑" : "↓") : "↕"}
@@ -475,7 +367,7 @@ export default async function InventoryStockPage({
                 </th>
                 <th className="whitespace-nowrap px-4 py-3 text-right">
                   <Link
-                    href={buildStockUrl(filters, 1, stockPageSize, "reorderMin", sort === "reorderMin" && dir === "asc" ? "desc" : "asc")}
+                    href={buildStockUrl(BASE, filters, 1, stockPageSize, "reorderMin", sort === "reorderMin" && dir === "asc" ? "desc" : "asc")}
                     className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200"
                   >
                     Reorder {sort === "reorderMin" ? (dir === "asc" ? "↑" : "↓") : "↕"}
@@ -506,6 +398,13 @@ export default async function InventoryStockPage({
                     />
                   </td>
                   <td className="px-4 py-2 align-top">
+                    <StockTypeSelect
+                      productId={s.productId}
+                      productType={s.productType}
+                      canEdit={canEditBrand}
+                    />
+                  </td>
+                  <td className="px-4 py-2 align-top">
                     <StockGstSelect productId={s.productId} gstPct={s.gstPct} canEdit={canEditBrand} />
                   </td>
                   <td
@@ -526,9 +425,9 @@ export default async function InventoryStockPage({
           </table>
           {stock.length === 0 && (
             <p className="px-4 py-6 text-center text-zinc-500">
-              {q.trim() ||
-              supplierFilterId ||
-              brandFilterId ||
+              {filters.q.trim() ||
+              filters.supplierId ||
+              filters.brandId ||
               hasActiveExpiryFilter(expiryPreset, expiryOnFilter) ||
               lowStockOnly
                 ? "No matching stock for these filters."
@@ -545,8 +444,8 @@ export default async function InventoryStockPage({
             basePath={BASE}
             pageParamName="spage"
             extraHidden={stockPaginationHidden(filters, stockPageSize, sort, dir)}
-            prevHref={buildStockUrl(filters, Math.max(1, spage - 1), stockPageSize, sort, dir)}
-            nextHref={buildStockUrl(filters, Math.min(totalStockPages, spage + 1), stockPageSize, sort, dir)}
+            prevHref={buildStockUrl(BASE, filters, Math.max(1, spage - 1), stockPageSize, sort, dir)}
+            nextHref={buildStockUrl(BASE, filters, Math.min(totalStockPages, spage + 1), stockPageSize, sort, dir)}
           />
         ) : null}
       </section>
