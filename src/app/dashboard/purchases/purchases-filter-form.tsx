@@ -5,11 +5,11 @@ import { DateRangePickerFields } from "@/components/date-range-picker-fields";
 import { FilterOptionsCombobox } from "@/components/filter-options-combobox";
 import { readFormParams, useCascadingFilterOptions } from "@/components/use-cascading-filter-options";
 import { formatAppMonthEndYmd, formatAppMonthStartYmd } from "@/lib/app-timezone";
-import type { PurchaseDateOn, PurchaseStatusFilter } from "@/lib/purchases-filter-options";
+import type { PurchaseDateOn, PurchasePaidFilter, PurchaseStatusFilter } from "@/lib/purchases-filter-options";
 
-export type { PurchaseDateOn, PurchaseStatusFilter };
+export type { PurchaseDateOn, PurchasePaidFilter, PurchaseStatusFilter };
 
-const FILTER_FIELDS = ["from", "to", "dateOn", "status", "supplier", "invoice", "product"] as const;
+const FILTER_FIELDS = ["from", "to", "dateOn", "status", "paid", "supplier", "invoice", "product"] as const;
 
 export function PurchasesFilterForm({
   actionPath,
@@ -20,6 +20,7 @@ export function PurchasesFilterForm({
   invoice,
   product,
   status,
+  paid,
   initialOptions,
   hiddenLimit,
   hiddenSort,
@@ -35,6 +36,7 @@ export function PurchasesFilterForm({
   invoice: string;
   product: string;
   status: PurchaseStatusFilter;
+  paid: PurchasePaidFilter;
   initialOptions: { suppliers: string[]; products: string[] };
   hiddenLimit?: string;
   hiddenSort?: string;
@@ -98,6 +100,21 @@ export function PurchasesFilterForm({
             <option value="">All</option>
             <option value="complete">Finalized</option>
             <option value="in_progress">Editing</option>
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Payment</span>
+          <select
+            name="paid"
+            defaultValue={paid}
+            onChange={refresh}
+            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+            aria-label="Payment status"
+          >
+            <option value="">All</option>
+            <option value="unpaid">Unpaid</option>
+            <option value="paid">Paid</option>
           </select>
         </label>
 

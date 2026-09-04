@@ -5,6 +5,7 @@ import { withServerTimedCache } from "@/lib/server-timed-cache";
 
 export type PurchaseDateOn = "recorded" | "invoice";
 export type PurchaseStatusFilter = "" | "complete" | "in_progress";
+export type PurchasePaidFilter = "" | "unpaid" | "paid";
 
 export type PurchaseFilterParams = {
   storeId: string;
@@ -15,6 +16,7 @@ export type PurchaseFilterParams = {
   invoice?: string;
   product?: string;
   status?: PurchaseStatusFilter;
+  paid?: PurchasePaidFilter;
 };
 
 type PurchaseFilterExclude = "supplier" | "product";
@@ -50,6 +52,9 @@ export function buildPurchaseFilterWhere(
   if (params.status === "complete") where.complete = true;
   else if (params.status === "in_progress") where.complete = false;
 
+  if (params.paid === "unpaid") where.paid = false;
+  else if (params.paid === "paid") where.paid = true;
+
   return where;
 }
 
@@ -65,6 +70,7 @@ export async function getPurchaseFilterOptions(params: PurchaseFilterParams) {
       invoice: params.invoice?.trim() ?? "",
       product: params.product?.trim() ?? "",
       status: params.status ?? "",
+      paid: params.paid ?? "",
     },
     20_000,
     async () => {

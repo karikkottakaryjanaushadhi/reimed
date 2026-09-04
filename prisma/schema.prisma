@@ -170,6 +170,16 @@ model Purchase {
   notes       String?
   /// When true, purchase is finalized — supplier/invoice/notes and lines are view only (no API re-open).
   complete    Boolean        @default(false)
+  /// CASH | CARD | UPI | CREDIT — how the supplier bill was / will be settled.
+  paymentMode String         @default("CASH")
+  /// GST-inclusive amount settled against this bill (net after returns).
+  amountPaid  Decimal        @default(0) @db.Decimal(12, 2)
+  /// Filter/badge; true when settled. Outstanding uses amountPaid vs net.
+  paid        Boolean        @default(true)
+  /// Calendar date payment was made (null when unpaid).
+  paidAt      DateTime?
+  /// Last 4 of UPI/card txn / UTR (null for cash/credit or unpaid).
+  paymentRefLast4 String?    @db.VarChar(4)
   createdAt   DateTime       @default(now())
   createdById String
   store       Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -182,6 +192,7 @@ model Purchase {
   @@index([storeId, createdAt])
   @@index([storeId, invoiceDate])
   @@index([storeId, complete])
+  @@index([storeId, paid])
   @@index([supplierId])
 }
 

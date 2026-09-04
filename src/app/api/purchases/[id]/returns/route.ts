@@ -4,8 +4,11 @@ import { z } from "zod";
 import { getAuthContext, isManager } from "@/lib/auth-context";
 import { decrementInventoryLotStock } from "@/lib/inventory-lot-upsert";
 import { prisma } from "@/lib/prisma";
-import { purchaseLineTotalWithGst } from "@/lib/purchase-line";
+import { purchaseBillTotalsFromLines, purchaseLineTotalWithGst } from "@/lib/purchase-line";
 import { returnLinePurchaseCreditInclusive } from "@/lib/purchase-return";
+import { paidFlagAfterNetChange } from "@/lib/purchase-paid";
+import { netPurchaseTotal } from "@/lib/purchase-return-aggregates";
+import { snapProductGstPct } from "@/lib/product-gst-slabs";
 import { storeUpperOpt } from "@/lib/store-text";
 
 const bodySchema = z.object({
@@ -150,6 +153,38 @@ export async function POST(
           },
         },
       });
+
+      const returnCreditsAgg = await tx.purchaseReturn.aggregate({
+        where: { purchaseId, storeId },
+        _sum: { total: true },
+      });
+      const billTotals = purchaseBillTotalsFromLines(
+        purchase.lines.map((line) => ({
+          quantity: line.quantity,
+          costPrice: Number(line.costPrice),
+          pack: line.pack,
+          purchaseDiscountPct: Number(line.purchaseDiscountPct),
+          purchaseDiscountRs: Number(line.purchaseDiscountRs),
+          schemeDiscountPct: Number(line.schemeDiscountPct),
+          schemeDiscountRs: Number(line.schemeDiscountRs),
+          gstPct: snapProductGstPct(line.gstPct),
+        })),
+      );
+      const newNet = netPurchaseTotal(
+        billTotals.grandTotal,
+        Number(returnCreditsAgg._sum.total ?? 0),
+      );
+      const nextPaid = paidFlagAfterNetChange(
+        Number(purchase.amountPaid),
+        newNet,
+        purchase.paid,
+      );
+      if (nextPaid !== purchase.paid) {
+        await tx.purchase.update({
+          where: { id: purchaseId },
+          data: { paid: nextPaid },
+        });
+      }
 
       return purchaseReturn;
     });

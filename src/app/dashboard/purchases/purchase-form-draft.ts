@@ -39,6 +39,10 @@ export type PurchaseFormDraft = {
   draftQ: string;
   draftNewProduct: boolean;
   editingInProgress: boolean;
+  paymentMode?: "CASH" | "CARD" | "UPI" | "CREDIT";
+  billPaid?: boolean;
+  paidAt?: string;
+  paymentRefLast4?: string;
   importMetaNotes: string;
   saleRateDrafts: Record<string, string>;
 };

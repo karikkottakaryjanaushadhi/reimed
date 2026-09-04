@@ -8,6 +8,8 @@ import { purchaseBillTotalsFromLines } from "@/lib/purchase-line";
 import { netPurchaseTotal } from "@/lib/purchase-return-aggregates";
 import { snapProductGstPct } from "@/lib/product-gst-slabs";
 import { PurchaseDetailClient } from "../purchase-detail-client";
+import { PurchasePaidSwitch } from "../purchase-paid-switch";
+import { purchaseDueContribution } from "@/lib/purchase-paid";
 
 export default async function PurchaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getAuthContext();
@@ -76,6 +78,9 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
     })),
   );
   const netTotal = netPurchaseTotal(billTotals.grandTotal, returnCreditsTotal);
+  const amountPaid = Number(purchase.amountPaid);
+  const due = purchaseDueContribution(purchase.paid, netTotal, amountPaid);
+  const paidAtYmd = purchase.paidAt ? format(purchase.paidAt, "yyyy-MM-dd") : null;
 
   const invDateStr = purchase.invoiceDate
     ? format(purchase.invoiceDate, "yyyy-MM-dd")
@@ -182,6 +187,24 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
                 : "Editing allowed"}
             </dd>
           </div>
+          <div>
+            <dt className="text-zinc-500">Amount paid</dt>
+            <dd className="tabular-nums">₹{amountPaid.toFixed(2)}</dd>
+          </div>
+          <div>
+            <dt className="text-zinc-500">Due / credit</dt>
+            <dd
+              className={`tabular-nums font-medium ${
+                due > 0
+                  ? "text-amber-800 dark:text-amber-200"
+                  : due < 0
+                    ? "text-emerald-700 dark:text-emerald-300"
+                    : ""
+              }`}
+            >
+              {due === 0 ? "—" : due > 0 ? `₹${due.toFixed(2)} due` : `₹${Math.abs(due).toFixed(2)} credit`}
+            </dd>
+          </div>
           {purchase.notes?.trim() ? (
             <div className="sm:col-span-2">
               <dt className="text-zinc-500">Notes</dt>
@@ -189,6 +212,17 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
             </div>
           ) : null}
         </dl>
+
+        <div className="mt-4">
+          <h2 className="mb-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">Supplier payment</h2>
+          <PurchasePaidSwitch
+            purchaseId={purchase.id}
+            initialPaid={purchase.paid}
+            initialPaymentMode={purchase.paymentMode}
+            initialPaidAtYmd={paidAtYmd}
+            initialPaymentRefLast4={purchase.paymentRefLast4}
+          />
+        </div>
 
         <div className="mt-4">
           <PurchaseDetailClient

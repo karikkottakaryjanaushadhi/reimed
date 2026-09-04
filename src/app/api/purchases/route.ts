@@ -13,6 +13,12 @@ import { normalizeInventoryLotExpiryDate } from "@/lib/inventory-lot-expiry";
 import { lotSalePricingFromPurchaseLine } from "@/lib/inventory-lot-pricing";
 import { upsertInventoryLotStockFromPurchase } from "@/lib/inventory-lot-upsert";
 import { storeUpper, storeUpperNull, storeUpperOpt } from "@/lib/store-text";
+import type { PaymentMode } from "@/lib/constants";
+import {
+  defaultPurchasePaid,
+  resolvePurchaseSettlement,
+} from "@/lib/purchase-paid";
+import { purchaseBillTotalsFromLines } from "@/lib/purchase-line";
 
 function purchaseApiErrorMessage(err: unknown): string {
   if (err instanceof Prisma.PrismaClientKnownRequestError) return err.message;
@@ -88,6 +94,11 @@ const bodySchema = z.object({
   notes: z.string().optional(),
   /** When true, purchase is finalized immediately (view only on detail page). Default false (still editing). */
   complete: z.boolean().optional(),
+  paymentMode: z.enum(["CASH", "CARD", "UPI", "CREDIT"]).optional(),
+  paid: z.boolean().optional(),
+  /** yyyy-mm-dd when paid */
+  paidAt: z.string().optional(),
+  paymentRefLast4: z.string().optional(),
   lines: z.array(lineSchema).min(1),
 });
 
@@ -239,6 +250,28 @@ export async function POST(req: Request) {
         data: { nextPurchaseNo: { increment: 1 } },
       });
 
+      const paymentMode = (parsed.data.paymentMode ?? "CASH") as PaymentMode;
+      const billTotals = purchaseBillTotalsFromLines(
+        resolvedLines.map((row) => ({
+          quantity: row.quantity,
+          costPrice: row.costPrice,
+          pack: row.pack,
+          purchaseDiscountPct: row.purchaseDiscountPct,
+          purchaseDiscountRs: row.purchaseDiscountRs,
+          schemeDiscountPct: row.schemeDiscountPct,
+          schemeDiscountRs: row.schemeDiscountRs,
+          gstPct: row.gstPct,
+        })),
+      );
+      const paid = parsed.data.paid ?? defaultPurchasePaid(paymentMode);
+      const settlement = resolvePurchaseSettlement({
+        paymentMode,
+        paid,
+        netTotal: billTotals.grandTotal,
+        paidAtYmd: parsed.data.paidAt,
+        paymentRefLast4: parsed.data.paymentRefLast4,
+      });
+
       const p = await tx.purchase.create({
         data: {
           storeId,
@@ -248,6 +281,11 @@ export async function POST(req: Request) {
           invoiceDate: invoiceDateVal,
           notes: storeUpperOpt(parsed.data.notes),
           complete: parsed.data.complete ?? false,
+          paymentMode: settlement.paymentMode,
+          paid: settlement.paid,
+          amountPaid: settlement.amountPaid,
+          paidAt: settlement.paidAt,
+          paymentRefLast4: settlement.paymentRefLast4,
           createdById: ctx.user.id,
           lines: {
             create: resolvedLines.map((row) => ({

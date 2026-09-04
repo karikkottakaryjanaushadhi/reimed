@@ -6,8 +6,10 @@ import { ListPageSizeControls, ListPaginationNav } from "@/components/list-pagin
 import {
   PurchasesFilterForm,
   type PurchaseDateOn,
+  type PurchasePaidFilter,
   type PurchaseStatusFilter,
 } from "@/app/dashboard/purchases/purchases-filter-form";
+import { PurchasePaidSwitch } from "@/app/dashboard/purchases/purchase-paid-switch";
 import {
   PurchasesListMobile,
   type PurchaseListCardRow,
@@ -45,6 +47,7 @@ function purchaseListExtras(
   invoice: string,
   product: string,
   status: PurchaseStatusFilter,
+  paid: PurchasePaidFilter,
   pageSize: number,
   sort: string,
   dir: string,
@@ -57,6 +60,7 @@ function purchaseListExtras(
   if (invoice) e.invoice = invoice;
   if (product) e.product = product;
   if (status) e.status = status;
+  if (paid) e.paid = paid;
   if (pageSize !== DEFAULT_LIST_PAGE_SIZE) e.limit = String(pageSize);
   if (sort && sort !== "createdAt") e.sort = sort;
   if (dir && dir !== "desc") e.dir = dir;
@@ -85,6 +89,11 @@ function parsePurchaseDateOn(raw: unknown): PurchaseDateOn {
 
 function parsePurchaseStatus(raw: unknown): PurchaseStatusFilter {
   if (raw === "complete" || raw === "in_progress") return raw;
+  return "";
+}
+
+function parsePurchasePaid(raw: unknown): PurchasePaidFilter {
+  if (raw === "unpaid" || raw === "paid") return raw;
   return "";
 }
 
@@ -145,6 +154,7 @@ export default async function PurchasesPage({
     invoice?: string;
     product?: string;
     status?: string;
+    paid?: string;
     sort?: string;
     dir?: string;
   }>;
@@ -169,6 +179,7 @@ export default async function PurchasesPage({
   const invoice = typeof sp.invoice === "string" ? sp.invoice.trim() : "";
   const product = typeof sp.product === "string" ? sp.product.trim() : "";
   const status = parsePurchaseStatus(sp.status);
+  const paid = parsePurchasePaid(sp.paid);
   const sort =
     sp.sort === "purchaseNo" ||
     sp.sort === "supplier" ||
@@ -188,6 +199,7 @@ export default async function PurchasesPage({
     invoice,
     product,
     status,
+    paid,
   };
 
   const filterOptions = await getPurchaseFilterOptions(filterParams);
@@ -211,6 +223,10 @@ export default async function PurchasesPage({
         invoiceRef: true,
         invoiceDate: true,
         complete: true,
+        paid: true,
+        paymentMode: true,
+        paidAt: true,
+        paymentRefLast4: true,
         supplier: { select: { name: true } },
         lines: { select: purchaseBillLineSelect },
       },
@@ -233,6 +249,7 @@ export default async function PurchasesPage({
     invoice,
     product,
     status,
+    paid,
     pageSize,
     sort,
     dir,
@@ -251,6 +268,7 @@ export default async function PurchasesPage({
     ...(invoice ? { invoice } : {}),
     ...(product ? { product } : {}),
     ...(status ? { status } : {}),
+    ...(paid ? { paid } : {}),
     from: monthFrom,
     to: monthTo,
   });
@@ -263,6 +281,7 @@ export default async function PurchasesPage({
     invoice ||
     product ||
     status ||
+    paid ||
     dateOn !== "recorded"
   );
 
@@ -273,6 +292,7 @@ export default async function PurchasesPage({
   if (invoice) activeFilterCount += 1;
   if (product) activeFilterCount += 1;
   if (status) activeFilterCount += 1;
+  if (paid) activeFilterCount += 1;
 
   const purchaseCards: PurchaseListCardRow[] = purchases.map((p) => {
     const totals = purchaseBillTotalsFromLines(p.lines.map(toPurchaseBillLine));
@@ -285,6 +305,8 @@ export default async function PurchasesPage({
       invoiceDateIso: p.invoiceDate?.toISOString() ?? null,
       totalInclGst: totals.grandTotal,
       complete: p.complete,
+      paid: p.paid,
+      paymentMode: p.paymentMode,
     };
   });
 
@@ -334,11 +356,11 @@ export default async function PurchasesPage({
 
       <MobileFilterSheet
         title="Filter purchases"
-        description={`Defaults to this month. Filter by ${dateOnLabel}, supplier, invoice, product on any line, or status.`}
+        description={`Defaults to this month. Filter by ${dateOnLabel}, supplier, invoice, product, status, or payment.`}
         activeCount={activeFilterCount}
       >
         <PurchasesFilterForm
-          key={[from, to, dateOn, supplier, invoice, product, status].join("\0")}
+          key={[from, to, dateOn, supplier, invoice, product, status, paid].join("\0")}
           actionPath="/dashboard/purchases"
           from={from}
           to={to}
@@ -347,6 +369,7 @@ export default async function PurchasesPage({
           invoice={invoice}
           product={product}
           status={status}
+          paid={paid}
           initialOptions={filterOptions}
           hiddenLimit={pageSize !== DEFAULT_LIST_PAGE_SIZE ? String(pageSize) : undefined}
           hiddenSort={sort !== "createdAt" ? sort : undefined}
@@ -439,12 +462,23 @@ export default async function PurchasesPage({
                   </Link>
                 </th>
                 <th className="px-4 py-3 text-right">Total (incl. GST, approx.)</th>
+                <th className="px-4 py-3 text-center">Paid</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {purchases.map((p) => {
                 const totals = purchaseBillTotalsFromLines(p.lines.map(toPurchaseBillLine));
+                const modeLabel =
+                  p.paymentMode === "UPI"
+                    ? "UPI"
+                    : p.paymentMode === "CASH"
+                      ? "Cash"
+                      : p.paymentMode === "CARD"
+                        ? "Card"
+                        : p.paymentMode === "CREDIT"
+                          ? "Credit"
+                          : p.paymentMode;
                 return (
                   <tr key={p.id} className="border-t border-zinc-100 dark:border-zinc-800">
                     <td className="px-4 py-2 font-medium tabular-nums">
@@ -464,6 +498,19 @@ export default async function PurchasesPage({
                       {p.invoiceDate ? format(p.invoiceDate, "dd MMM yyyy") : "—"}
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums">₹{totals.grandTotal.toFixed(2)}</td>
+                    <td className="px-4 py-2 text-center">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <PurchasePaidSwitch
+                          purchaseId={p.id}
+                          initialPaid={p.paid}
+                          initialPaymentMode={p.paymentMode}
+                          initialPaidAtYmd={p.paidAt ? format(p.paidAt, "yyyy-MM-dd") : null}
+                          initialPaymentRefLast4={p.paymentRefLast4}
+                          variant="toggle"
+                        />
+                        <span className="text-[10px] text-zinc-500">{modeLabel}</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-2 text-right">
                       <Link
                         href={`/dashboard/purchases/${p.id}`}
@@ -483,7 +530,7 @@ export default async function PurchasesPage({
                     Totals ({totalCount} {totalCount === 1 ? "purchase" : "purchases"})
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">₹{summary.grandTotal.toFixed(2)}</td>
-                  <td className="px-4 py-3" />
+                  <td className="px-4 py-3" colSpan={2} />
                 </tr>
               </tfoot>
             ) : null}

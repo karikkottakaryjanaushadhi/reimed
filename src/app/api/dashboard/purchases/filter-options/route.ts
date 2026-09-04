@@ -3,6 +3,7 @@ import { getAuthContext, isManager } from "@/lib/auth-context";
 import {
   getPurchaseFilterOptions,
   type PurchaseDateOn,
+  type PurchasePaidFilter,
   type PurchaseStatusFilter,
 } from "@/lib/purchases-filter-options";
 
@@ -12,6 +13,11 @@ function parseDateOn(raw: string | null): PurchaseDateOn {
 
 function parseStatus(raw: string | null): PurchaseStatusFilter {
   if (raw === "complete" || raw === "in_progress") return raw;
+  return "";
+}
+
+function parsePaid(raw: string | null): PurchasePaidFilter {
+  if (raw === "unpaid" || raw === "paid") return raw;
   return "";
 }
 
@@ -30,6 +36,7 @@ export async function GET(req: Request) {
     invoice: searchParams.get("invoice") ?? undefined,
     product: searchParams.get("product") ?? undefined,
     status: parseStatus(searchParams.get("status")),
+    paid: parsePaid(searchParams.get("paid")),
   });
 
   return NextResponse.json(options, {

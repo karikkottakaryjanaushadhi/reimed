@@ -13,6 +13,8 @@ export type PurchaseListCardRow = {
   invoiceDateIso: string | null;
   totalInclGst: number;
   complete: boolean;
+  paid: boolean;
+  paymentMode: string;
 };
 
 export function PurchasesListMobile({
@@ -71,6 +73,22 @@ export function PurchasesListMobile({
             <div>
               <dt className="text-xs text-zinc-500">Status</dt>
               <dd>{p.complete ? "Finalized" : "Editing"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-zinc-500">Payment</dt>
+              <dd>
+                {p.paid ? "Paid" : "Unpaid"}
+                {" · "}
+                {p.paymentMode === "UPI"
+                  ? "UPI / GPay"
+                  : p.paymentMode === "CASH"
+                    ? "Cash"
+                    : p.paymentMode === "CARD"
+                      ? "Card"
+                      : p.paymentMode === "CREDIT"
+                        ? "Credit"
+                        : p.paymentMode}
+              </dd>
             </div>
           </dl>
           <Link

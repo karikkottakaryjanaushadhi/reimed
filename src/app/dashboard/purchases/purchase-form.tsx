@@ -36,6 +36,12 @@ import {
   syncSalesDiscountFromRs,
 } from "@/lib/purchase-line";
 import { navigatePurchaseTable } from "@/lib/purchase-table-nav";
+import type { PaymentMode } from "@/lib/constants";
+import {
+  defaultPurchasePaid,
+  paymentRefApplies,
+  todayPaidAtYmd,
+} from "@/lib/purchase-paid";
 import type { ProductCategory } from "@/lib/product-categories";
 import type { ProductType } from "@/lib/product-types";
 import { snapProductGstPct } from "@/lib/product-gst-slabs";
@@ -269,6 +275,10 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
   const [importMetaNotes, setImportMetaNotes] = useState("");
   /** Checked = still editing after post (purchase stays open on detail). Uncheck before posting to finalize at once. */
   const [editingInProgress, setEditingInProgress] = useState(true);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>("CASH");
+  const [billPaid, setBillPaid] = useState(true);
+  const [paidAt, setPaidAt] = useState(todayPaidAtYmd());
+  const [paymentRefLast4, setPaymentRefLast4] = useState("");
   const [draftHitHi, setDraftHitHi] = useState(0);
   const [draftPopRect, setDraftPopRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const [supplierPopRect, setSupplierPopRect] = useState<{ top: number; left: number; width: number } | null>(null);
@@ -285,6 +295,10 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
         draftQ,
         draftNewProduct,
         editingInProgress,
+        paymentMode,
+        billPaid,
+        paidAt,
+        paymentRefLast4,
         importMetaNotes,
         saleRateDrafts: {},
       }),
@@ -298,6 +312,10 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
       draftQ,
       draftNewProduct,
       editingInProgress,
+      paymentMode,
+      billPaid,
+      paidAt,
+      paymentRefLast4,
       importMetaNotes,
     ],
   );
@@ -325,6 +343,10 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
     setDraftQ(d.draftQ);
     setDraftNewProduct(d.draftNewProduct);
     setEditingInProgress(d.editingInProgress);
+    setPaymentMode(d.paymentMode ?? "CASH");
+    setBillPaid(d.billPaid ?? defaultPurchasePaid(d.paymentMode ?? "CASH"));
+    setPaidAt(d.paidAt || todayPaidAtYmd());
+    setPaymentRefLast4(d.paymentRefLast4 ?? "");
     setImportMetaNotes(d.importMetaNotes);
     setDraftKey((k) => k + 1);
     setLinkRowIndex(null);
@@ -1164,6 +1186,14 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
           invoiceDate: invoiceDate.trim(),
           notes: importMetaNotes.trim() || undefined,
           complete: !editingInProgress,
+          paymentMode,
+          paid: billPaid,
+          ...(billPaid
+            ? {
+                paidAt: paidAt.trim() || todayPaidAtYmd(),
+                paymentRefLast4: paymentRefLast4.trim() || undefined,
+              }
+            : {}),
           lines: payloadLines,
         }),
       });
@@ -1183,6 +1213,10 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
       setBillingPreview(null);
       setImportMetaNotes("");
       setEditingInProgress(true);
+      setPaymentMode("CASH");
+      setBillPaid(true);
+      setPaidAt(todayPaidAtYmd());
+      setPaymentRefLast4("");
       setInvoiceNo("");
       setInvoiceDate("");
       setSupplierId("");
@@ -2197,6 +2231,72 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
         </p>
       )}
       <div className="mt-4 space-y-3">
+        <div className="grid gap-3 rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 sm:grid-cols-2 dark:border-zinc-700 dark:bg-zinc-950/40">
+          <label className="text-sm">
+            <span className="text-zinc-600 dark:text-zinc-400">Payment mode</span>
+            <select
+              className="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-950"
+              value={paymentMode}
+              disabled={busy}
+              onChange={(e) => {
+                const mode = e.target.value as PaymentMode;
+                setPaymentMode(mode);
+                const nextPaid = defaultPurchasePaid(mode);
+                setBillPaid(nextPaid);
+                if (!paymentRefApplies(mode)) setPaymentRefLast4("");
+                if (nextPaid && !paidAt) setPaidAt(todayPaidAtYmd());
+              }}
+            >
+              <option value="CASH">Cash</option>
+              <option value="CARD">Card</option>
+              <option value="UPI">UPI / GPay</option>
+              <option value="CREDIT">Credit</option>
+            </select>
+          </label>
+          <label className="flex items-end gap-2 pb-1 text-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-zinc-300"
+              checked={billPaid}
+              disabled={busy}
+              onChange={(e) => {
+                const next = e.target.checked;
+                setBillPaid(next);
+                if (next && !paidAt) setPaidAt(todayPaidAtYmd());
+                if (!next) setPaymentRefLast4("");
+              }}
+            />
+            <span className="font-medium text-zinc-800 dark:text-zinc-200">Bill paid</span>
+          </label>
+          {billPaid ? (
+            <>
+              <label className="text-sm">
+                <span className="text-zinc-600 dark:text-zinc-400">Paid on</span>
+                <DatePickerInput
+                  className="rounded-lg border border-zinc-300 px-2 py-2 dark:border-zinc-600 dark:bg-zinc-950"
+                  wrapperClassName="mt-1 w-full"
+                  value={paidAt}
+                  disabled={busy}
+                  onChange={(e) => setPaidAt(e.target.value)}
+                />
+              </label>
+              {paymentRefApplies(paymentMode) ? (
+                <label className="text-sm">
+                  <span className="text-zinc-600 dark:text-zinc-400">Txn last 4</span>
+                  <input
+                    className="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-950"
+                    value={paymentRefLast4}
+                    maxLength={8}
+                    placeholder="e.g. 1A2B"
+                    autoComplete="off"
+                    disabled={busy}
+                    onChange={(e) => setPaymentRefLast4(e.target.value.toUpperCase())}
+                  />
+                </label>
+              ) : null}
+            </>
+          ) : null}
+        </div>
         <PurchaseEditingInProgressSwitch
           checked={editingInProgress}
           disabled={busy}
