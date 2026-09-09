@@ -8,7 +8,6 @@ import { gstPctNumber } from "@/lib/product-gst-slabs";
 import { productCategoryLabel } from "@/lib/product-categories";
 import { productTypeLabel } from "@/lib/product-types";
 import { productScheduleLabel } from "@/lib/product-schedules";
-import { displayDrugCode } from "@/lib/drug-code";
 import type { ProductListRow } from "@/lib/product-list-row";
 import { ProductForm, productRowToFormValues } from "./product-form";
 import { ProductsListMobile } from "./products-list-mobile";
@@ -108,11 +107,6 @@ export function ProductsTable({
     router.refresh();
   }, [router]);
 
-  function addStockHref(productId: string, productName: string): string {
-    const p = new URLSearchParams({ productId, productName });
-    return `/dashboard/inventory/add-stock?${p}`;
-  }
-
   const sortHref = (col: string) =>
     buildSimpleListUrl("/dashboard/products", 1, pageSize, {
       ...extras,
@@ -126,54 +120,62 @@ export function ProductsTable({
         products={products}
         isManager={isManager}
         onEdit={setEditRow}
-        addStockHref={addStockHref}
       />
 
-      <div className="hidden overflow-x-auto rounded-xl border border-zinc-200 bg-white md:block dark:border-zinc-800 dark:bg-zinc-900">
-        <table className="w-full min-w-[56rem] text-left text-sm">
+      <div className="hidden overflow-hidden rounded-xl border border-zinc-200 bg-white md:block dark:border-zinc-800 dark:bg-zinc-900">
+        <table className="w-full table-fixed text-left text-sm">
+          <colgroup>
+            <col className="w-[17rem]" />
+            <col className="w-[8.5rem]" />
+            <col className="w-[13rem]" />
+            <col className="w-[5rem]" />
+            <col className="w-[3.75rem]" />
+            <col className="w-[4.75rem]" />
+            <col className="w-[12rem]" />
+            <col className="w-[3.25rem]" />
+            <col className="w-[3rem]" />
+            <col className="w-[3.5rem]" />
+            <col className="w-[4.5rem]" />
+            {isManager ? <col className="w-[3.5rem]" /> : null}
+          </colgroup>
           <thead className="bg-zinc-50 text-xs uppercase text-zinc-500 dark:bg-zinc-800">
             <tr>
               <th className="px-4 py-3">
-                <Link href={sortHref("name")} className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
+                <Link href={sortHref("name")} className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
                   Name {sort === "name" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
               <th className="px-4 py-3">
-                <Link href={sortHref("sku")} className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
-                  Drug code {sort === "sku" ? (dir === "asc" ? "↑" : "↓") : "↕"}
-                </Link>
-              </th>
-              <th className="px-4 py-3">
-                <Link href={sortHref("brand")} className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
+                <Link href={sortHref("brand")} className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
                   Brand {sort === "brand" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
               <th className="px-4 py-3">
-                <Link href={sortHref("generic")} className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
+                <Link href={sortHref("generic")} className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
                   Generic {sort === "generic" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
-              <th className="px-4 py-3">Category</th>
-              <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Schedule</th>
-              <th className="min-w-[8rem] px-4 py-3">Supplier</th>
-              <th className="px-4 py-3 text-right">
-                <Link href={sortHref("stock")} className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
+              <th className="px-2 py-3">Category</th>
+              <th className="px-2 py-3">Type</th>
+              <th className="px-2 py-3">Schedule</th>
+              <th className="px-4 py-3">Supplier</th>
+              <th className="px-2 py-3 text-right">
+                <Link href={sortHref("stock")} className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
                   Stock {sort === "stock" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
-              <th className="px-4 py-3 text-right">
-                <Link href={sortHref("packSize")} className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
+              <th className="px-2 py-3 text-right">
+                <Link href={sortHref("packSize")} className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
                   Pack {sort === "packSize" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
-              <th className="px-4 py-3 text-right">
-                <Link href={sortHref("gst")} className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
+              <th className="px-2 py-3 text-right">
+                <Link href={sortHref("gst")} className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
                   GST % {sort === "gst" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
-              <th className="px-4 py-3 text-right">
-                <Link href={sortHref("reorderMin")} className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
+              <th className="px-2 py-3 text-right">
+                <Link href={sortHref("reorderMin")} className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
                   Reorder {sort === "reorderMin" ? (dir === "asc" ? "↑" : "↓") : "↕"}
                 </Link>
               </th>
@@ -185,53 +187,51 @@ export function ProductsTable({
               const gst = gstPctNumber(p.gstPct);
               return (
                 <tr key={p.productId} className="border-t border-zinc-100 dark:border-zinc-800">
-                  <td className="max-w-[14rem] truncate px-4 py-2 font-medium" title={p.name}>
+                  <td className="truncate px-4 py-2 font-medium" title={p.name}>
                     {p.name}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-zinc-600 dark:text-zinc-400">
-                    {displayDrugCode(p.sku, p.productCategory) || "—"}
+                  <td className="truncate px-4 py-2 text-zinc-600 dark:text-zinc-400" title={p.brandName ?? undefined}>
+                    {p.brandName ?? "—"}
                   </td>
-                  <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">{p.brandName ?? "—"}</td>
-                  <td className="max-w-[12rem] truncate px-4 py-2 text-zinc-600 dark:text-zinc-400" title={p.genericName ?? undefined}>
+                  <td className="truncate px-4 py-2 text-zinc-600 dark:text-zinc-400" title={p.genericName ?? undefined}>
                     {p.genericName ?? "—"}
                   </td>
-                  <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">
+                  <td className="truncate px-2 py-2 text-zinc-600 dark:text-zinc-400" title={productCategoryLabel(p.productCategory)}>
                     {productCategoryLabel(p.productCategory)}
                   </td>
-                  <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">
+                  <td className="truncate px-2 py-2 text-zinc-600 dark:text-zinc-400" title={productTypeLabel(p.productType)}>
                     {productTypeLabel(p.productType)}
                   </td>
-                  <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">
+                  <td
+                    className="truncate px-2 py-2 text-zinc-600 dark:text-zinc-400"
+                    title={
+                      p.productSchedule && p.productSchedule !== "NONE"
+                        ? productScheduleLabel(p.productSchedule)
+                        : undefined
+                    }
+                  >
                     {p.productSchedule && p.productSchedule !== "NONE"
                       ? productScheduleLabel(p.productSchedule)
                       : "—"}
                   </td>
-                  <td className="max-w-[12rem] truncate px-4 py-2 text-zinc-600 dark:text-zinc-400" title={p.suppliers ?? undefined}>
+                  <td className="truncate px-4 py-2 text-zinc-600 dark:text-zinc-400" title={p.suppliers ?? undefined}>
                     {p.suppliers ?? "—"}
                   </td>
-                  <td className={`px-4 py-2 text-right tabular-nums ${stockCellClass(p.stockQty, p.reorderMin)}`}>
+                  <td className={`px-2 py-2 text-right tabular-nums ${stockCellClass(p.stockQty, p.reorderMin)}`}>
                     {p.stockQty}
                   </td>
-                  <td className="px-4 py-2 text-right tabular-nums">{p.packSize}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{gst}%</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{p.reorderMin}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{p.packSize}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{gst}%</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{p.reorderMin}</td>
                   {isManager ? (
                     <td className="px-4 py-2 text-right">
-                      <div className="flex flex-col items-end gap-1">
-                        <button
-                          type="button"
-                          className="font-medium text-brand-blue-light hover:underline"
-                          onClick={() => setEditRow(p)}
-                        >
-                          Edit
-                        </button>
-                        <Link
-                          href={addStockHref(p.productId, p.name)}
-                          className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
-                        >
-                          Add stock
-                        </Link>
-                      </div>
+                      <button
+                        type="button"
+                        className="font-medium text-brand-blue-light hover:underline"
+                        onClick={() => setEditRow(p)}
+                      >
+                        Edit
+                      </button>
                     </td>
                   ) : null}
                 </tr>

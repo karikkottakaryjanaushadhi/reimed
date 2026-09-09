@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import { gstPctNumber } from "@/lib/product-gst-slabs";
-import { displayDrugCode } from "@/lib/drug-code";
 import { productCategoryLabel } from "@/lib/product-categories";
 import { productTypeLabel } from "@/lib/product-types";
 import { productScheduleLabel } from "@/lib/product-schedules";
@@ -18,12 +16,10 @@ export function ProductsListMobile({
   products,
   isManager,
   onEdit,
-  addStockHref,
 }: {
   products: ProductListRow[];
   isManager: boolean;
   onEdit: (row: ProductListRow) => void;
-  addStockHref: (productId: string, productName: string) => string;
 }) {
   if (products.length === 0) {
     return (
@@ -45,11 +41,6 @@ export function ProductsListMobile({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-semibold text-zinc-900 dark:text-zinc-50">{p.name}</p>
-                {displayDrugCode(p.sku, p.productCategory) ? (
-                  <p className="mt-1 font-mono text-xs text-zinc-500">
-                    {displayDrugCode(p.sku, p.productCategory)}
-                  </p>
-                ) : null}
               </div>
               <p className={`shrink-0 text-lg font-semibold tabular-nums ${stockCellClass(p.stockQty, p.reorderMin)}`}>
                 {p.stockQty}
@@ -108,12 +99,6 @@ export function ProductsListMobile({
                 >
                   Edit
                 </button>
-                <Link
-                  href={addStockHref(p.productId, p.name)}
-                  className="touch-manipulation rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
-                >
-                  Add stock
-                </Link>
               </div>
             ) : null}
           </article>
