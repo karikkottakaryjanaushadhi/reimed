@@ -355,10 +355,14 @@ export async function POST(req: Request) {
         });
       }
 
+      const gstByProduct = new Map<string, number>();
       for (const row of resolvedLines) {
+        gstByProduct.set(row.productId, snapProductGstPct(row.gstPct));
+      }
+      for (const [productId, gstPct] of gstByProduct) {
         await tx.product.update({
-          where: { id: row.productId },
-          data: { gstPct: snapProductGstPct(row.gstPct) },
+          where: { id: productId },
+          data: { gstPct },
         });
       }
 

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { prisma } from "./prisma";
 import { SESSION_COOKIE, STORE_COOKIE } from "./constants";
@@ -30,7 +31,7 @@ export type AuthContext = {
   membership: AuthMembership;
 };
 
-export async function getAuthContext(): Promise<AuthContext | null> {
+export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -85,7 +86,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     activeStoreId,
     membership,
   };
-}
+});
 
 export function isManager(ctx: AuthContext) {
   return ctx.membership.role === "MANAGER";

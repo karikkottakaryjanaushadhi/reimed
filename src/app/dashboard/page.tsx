@@ -14,7 +14,7 @@ export default async function DashboardHome() {
   const storeId = ctx.activeStoreId;
   const today = parseAppYmdStart(formatAppDateYmd()) ?? startOfDay(new Date());
 
-  const [todaySales, todayReturnsSum, returnCountToday, inventoryStats] = await Promise.all([
+  const [todaySales, todayReturns, inventoryStats] = await Promise.all([
     prisma.sale.aggregate({
       where: { storeId, createdAt: { gte: today } },
       _sum: { total: true },
@@ -23,9 +23,7 @@ export default async function DashboardHome() {
     prisma.saleReturn.aggregate({
       where: { storeId, createdAt: { gte: today } },
       _sum: { total: true },
-    }),
-    prisma.saleReturn.count({
-      where: { storeId, createdAt: { gte: today } },
+      _count: true,
     }),
     getDashboardInventoryStats(storeId, today),
   ]);
@@ -33,10 +31,11 @@ export default async function DashboardHome() {
   const { expiringSoon, expired, lowSku } = inventoryStats;
 
   const grossToday = Number(todaySales._sum.total ?? 0);
-  const returnsToday = Number(todayReturnsSum._sum.total ?? 0);
+  const returnsToday = Number(todayReturns._sum.total ?? 0);
   const netToday = Math.round((grossToday - returnsToday) * 100) / 100;
   const todayYmd = formatAppDateYmd();
   const salesTodayHref = `/dashboard/sales?from=${todayYmd}&to=${todayYmd}`;
+  const returnCountToday = todayReturns._count;
 
   return (
     <div className="space-y-8">

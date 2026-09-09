@@ -88,26 +88,41 @@ export default async function TransfersPage({
   };
 
   const where = buildTransferFilterWhere(filterParams);
-  const [filterOptions, total] = await Promise.all([
+  const skipGuess = (rawPage - 1) * limit;
+  const [filterOptions, total, transfersGuess] = await Promise.all([
     getTransferFilterOptions(filterParams),
     prisma.stockTransfer.count({ where }),
+    prisma.stockTransfer.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: skipGuess,
+      take: limit,
+      include: {
+        fromStore: { select: { name: true } },
+        toStore: { select: { name: true } },
+        createdBy: { select: { name: true } },
+        lines: { select: { product: { select: { id: true, name: true } } } },
+      },
+    }),
   ]);
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const page = Math.min(rawPage, totalPages);
   const skip = (page - 1) * limit;
-
-  const transfers = await prisma.stockTransfer.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    skip,
-    take: limit,
-    include: {
-      fromStore: { select: { name: true } },
-      toStore: { select: { name: true } },
-      createdBy: { select: { name: true } },
-      lines: { select: { product: { select: { id: true, name: true } } } },
-    },
-  });
+  const transfers =
+    skip === skipGuess
+      ? transfersGuess
+      : await prisma.stockTransfer.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: limit,
+          include: {
+            fromStore: { select: { name: true } },
+            toStore: { select: { name: true } },
+            createdBy: { select: { name: true } },
+            lines: { select: { product: { select: { id: true, name: true } } } },
+          },
+        });
 
   const extras = transferListExtras(
     from,

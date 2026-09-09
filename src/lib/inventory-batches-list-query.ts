@@ -204,6 +204,35 @@ export async function resolveInventoryBatchesFilters(params: {
   };
 }
 
+export async function countInventoryBatches(params: {
+  storeId: string;
+  filters: InventoryBatchesFilters;
+}): Promise<number> {
+  const clauses = buildBatchFilterClauses(params.filters);
+  const [row] = await prisma.$queryRaw<Array<{ c: unknown }>>(
+    Prisma.sql`
+      SELECT COUNT(*) AS c
+      FROM "InventoryLot" il
+      INNER JOIN "Product" p ON p."id" = il."productId"
+      WHERE il."storeId" = ${params.storeId}
+      ${clauses.searchClause}
+      ${clauses.supplierClause}
+      ${clauses.brandClause}
+      ${clauses.expiryClause}
+      ${clauses.lowStockClause}
+      ${clauses.extra.categoryClause}
+      ${clauses.extra.typeClause}
+      ${clauses.extra.scheduleClause}
+      ${clauses.extra.qtyClause}
+    `,
+  );
+  const n = row?.c;
+  if (typeof n === "bigint") return Number(n);
+  if (typeof n === "number" && Number.isFinite(n)) return n;
+  const x = Number(n);
+  return Number.isFinite(x) ? x : 0;
+}
+
 export async function queryInventoryBatches(params: {
   storeId: string;
   filters: InventoryBatchesFilters;
@@ -220,9 +249,51 @@ export async function queryInventoryBatches(params: {
       ? Prisma.sql`LIMIT ${params.limit} OFFSET ${params.offset ?? 0}`
       : Prisma.sql``;
 
-  const idRows = await prisma.$queryRaw<Array<{ id: string }>>(
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      productId: string;
+      productName: string;
+      brandId: string | null;
+      brandName: string | null;
+      productCategory: string | null;
+      gstPct: unknown;
+      packSize: unknown;
+      productPackSize: unknown;
+      supplierName: string | null;
+      batchNo: string;
+      expiryDate: Date;
+      quantity: unknown;
+      reorderMin: unknown;
+      costPrice: unknown;
+      mrp: unknown;
+      saleRate: unknown;
+      salesDiscountPct: unknown;
+      salesDiscountRs: unknown;
+      stockCorrected: boolean;
+    }>
+  >(
     Prisma.sql`
-      SELECT il."id" AS "id"
+      SELECT il."id" AS "id",
+             il."productId" AS "productId",
+             p."name" AS "productName",
+             p."brandId" AS "brandId",
+             b."name" AS "brandName",
+             p."productCategory" AS "productCategory",
+             p."gstPct" AS "gstPct",
+             il."packSize" AS "packSize",
+             p."packSize" AS "productPackSize",
+             s."name" AS "supplierName",
+             il."batchNo" AS "batchNo",
+             il."expiryDate" AS "expiryDate",
+             il."quantity" AS "quantity",
+             p."reorderMin" AS "reorderMin",
+             il."costPrice" AS "costPrice",
+             il."mrp" AS "mrp",
+             il."saleRate" AS "saleRate",
+             il."salesDiscountPct" AS "salesDiscountPct",
+             il."salesDiscountRs" AS "salesDiscountRs",
+             il."stockCorrected" AS "stockCorrected"
       FROM "InventoryLot" il
       INNER JOIN "Product" p ON p."id" = il."productId"
       LEFT JOIN "Brand" b ON b."id" = p."brandId"
@@ -242,47 +313,24 @@ export async function queryInventoryBatches(params: {
     `,
   );
 
-  if (idRows.length === 0) return [];
-
-  const idOrder = new Map(idRows.map((r, i) => [r.id, i]));
-  const lots = await prisma.inventoryLot.findMany({
-    where: { id: { in: idRows.map((r) => r.id) } },
-    include: {
-      product: {
-        select: {
-          id: true,
-          name: true,
-          brandId: true,
-          productCategory: true,
-          gstPct: true,
-          packSize: true,
-          reorderMin: true,
-          brand: { select: { name: true } },
-        },
-      },
-      supplier: { select: { name: true } },
-    },
-  });
-  lots.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
-
   const today = startOfDay(new Date());
-  return lots.map((l) => {
+  return rows.map((l) => {
     const d = differenceInCalendarDays(l.expiryDate, today);
     return {
       id: l.id,
       productId: l.productId,
-      productName: l.product.name,
-      brandId: l.product.brandId,
-      brandName: l.product.brand?.name?.trim() || null,
-      productCategory: l.product.productCategory,
-      gstPct: gstPctNumber(l.product.gstPct),
-      packSize: lotPackSize(l),
-      supplierName: l.supplier?.name ?? null,
+      productName: l.productName,
+      brandId: l.brandId,
+      brandName: l.brandName?.trim() || null,
+      productCategory: l.productCategory,
+      gstPct: gstPctNumber(l.gstPct),
+      packSize: lotPackSize({ packSize: l.packSize, product: { packSize: l.productPackSize } }),
+      supplierName: l.supplierName,
       batchNo: l.batchNo,
       expiryDate: l.expiryDate.toISOString(),
       days: d,
-      quantity: l.quantity,
-      reorderMin: l.product.reorderMin,
+      quantity: Number(l.quantity) || 0,
+      reorderMin: Number(l.reorderMin) || 0,
       costPrice: Number(l.costPrice),
       mrp: Number(l.mrp),
       saleRate: Number(l.saleRate),

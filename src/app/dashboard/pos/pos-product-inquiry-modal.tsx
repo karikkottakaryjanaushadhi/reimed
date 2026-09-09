@@ -21,8 +21,21 @@ function rupee(n: number): string {
   return `₹${n.toFixed(2)}`;
 }
 
+const EMPTY_LOTS: ProductInquiryLot[] = [];
+
 function lotSellable(lot: ProductInquiryLot, avail: number): boolean {
   return !lot.expired && avail > 0;
+}
+
+function nextHighlightIndex(
+  lots: ProductInquiryLot[],
+  selectedLotId: string,
+  availableQty: (lotId: string, onHand: number) => number,
+): number {
+  const selected = lots.findIndex((l) => l.id === selectedLotId);
+  if (selected >= 0) return selected;
+  const firstSell = lots.findIndex((l) => lotSellable(l, availableQty(l.id, l.quantity)));
+  return firstSell >= 0 ? firstSell : 0;
 }
 
 function InquiryFact({ label, value }: { label: string; value: string }) {
@@ -50,6 +63,9 @@ export function PosProductInquiryModal({
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [hi, setHi] = useState(0);
+  const cacheRef = useRef(new Map<string, ProductInquiry>());
+  const availableQtyRef = useRef(availableQty);
+  availableQtyRef.current = availableQty;
 
   useEffect(() => {
     if (!open) return;
@@ -61,8 +77,10 @@ export function PosProductInquiryModal({
   }, [open]);
 
   useEffect(() => {
-    if (!open || !productId) {
-      setData(null);
+    if (!open || !productId) return;
+    const cached = cacheRef.current.get(productId);
+    if (cached) {
+      setData(cached);
       setErr(null);
       setLoading(false);
       return;
@@ -70,7 +88,6 @@ export function PosProductInquiryModal({
     const ac = new AbortController();
     setLoading(true);
     setErr(null);
-    setData(null);
     void (async () => {
       try {
         const res = await fetch(`/api/inventory/inquiry?productId=${encodeURIComponent(productId)}`, {
@@ -81,6 +98,7 @@ export function PosProductInquiryModal({
           setErr(json.error ?? "Could not load product");
           return;
         }
+        cacheRef.current.set(productId, json);
         setData(json);
       } catch (e) {
         if (e instanceof Error && e.name === "AbortError") return;
@@ -92,21 +110,13 @@ export function PosProductInquiryModal({
     return () => ac.abort();
   }, [open, productId]);
 
-  const lots = data?.lots ?? [];
+  const lots = data?.lots ?? EMPTY_LOTS;
 
   useEffect(() => {
-    if (!open || lots.length === 0) {
-      setHi(0);
-      return;
-    }
-    const selected = lots.findIndex((l) => l.id === selectedLotId);
-    if (selected >= 0) {
-      setHi(selected);
-      return;
-    }
-    const firstSell = lots.findIndex((l) => lotSellable(l, availableQty(l.id, l.quantity)));
-    setHi(firstSell >= 0 ? firstSell : 0);
-  }, [open, lots, selectedLotId, availableQty]);
+    if (!open || lots.length === 0) return;
+    const next = nextHighlightIndex(lots, selectedLotId, availableQtyRef.current);
+    setHi((h) => (h === next ? h : next));
+  }, [open, data, selectedLotId, lots.length]);
 
   useLayoutEffect(() => {
     if (!open || lots.length === 0) return;

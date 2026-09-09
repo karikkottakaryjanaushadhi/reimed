@@ -16,8 +16,9 @@ export async function getDashboardInventoryStats(
   const soonEnd = new Date(today);
   soonEnd.setDate(soonEnd.getDate() + EXPIRY_SOON_DAYS);
 
-  const [expiryRow] = await prisma.$queryRaw<Array<{ expiringSoon: unknown; expired: unknown }>>(
-    Prisma.sql`
+  const [expiryRow, lowRow] = await Promise.all([
+    prisma.$queryRaw<Array<{ expiringSoon: unknown; expired: unknown }>>(
+      Prisma.sql`
       SELECT
         COUNT(*) FILTER (
           WHERE il."expiryDate"::date >= ${today}::date
@@ -28,10 +29,9 @@ export async function getDashboardInventoryStats(
       FROM "InventoryLot" il
       WHERE il."storeId" = ${storeId} AND il."quantity" >= 0
     `,
-  );
-
-  const [lowRow] = await prisma.$queryRaw<Array<{ lowSku: unknown }>>(
-    Prisma.sql`
+    ),
+    prisma.$queryRaw<Array<{ lowSku: unknown }>>(
+      Prisma.sql`
       SELECT COUNT(*)::int AS "lowSku"
       FROM (
         SELECT p."id"
@@ -43,11 +43,12 @@ export async function getDashboardInventoryStats(
            AND COALESCE(SUM(il."quantity"), 0) <= p."reorderMin"
       ) AS low_products
     `,
-  );
+    ),
+  ]);
 
   return {
-    expiringSoon: Number(expiryRow?.expiringSoon) || 0,
-    expired: Number(expiryRow?.expired) || 0,
-    lowSku: Number(lowRow?.lowSku) || 0,
+    expiringSoon: Number(expiryRow[0]?.expiringSoon) || 0,
+    expired: Number(expiryRow[0]?.expired) || 0,
+    lowSku: Number(lowRow[0]?.lowSku) || 0,
   };
 }

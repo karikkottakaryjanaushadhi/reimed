@@ -23,30 +23,23 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
 
   const { id } = await params;
   const storeId = ctx.activeStoreId;
-  const purchase = await prisma.purchase.findFirst({
-    where: { id, storeId },
-    include: {
-      supplier: { select: { id: true, name: true } },
-      createdBy: { select: { name: true, email: true } },
-      lines: {
-        include: { product: { select: { id: true, name: true, sku: true } } },
-        orderBy: { id: "asc" },
+  const [purchase, returnedAgg, priorReturns, returnTotalsAgg] = await Promise.all([
+    prisma.purchase.findFirst({
+      where: { id, storeId },
+      include: {
+        supplier: { select: { id: true, name: true } },
+        createdBy: { select: { name: true, email: true } },
+        lines: {
+          include: { product: { select: { id: true, name: true, sku: true } } },
+          orderBy: { id: "asc" },
+        },
       },
-    },
-  });
-  if (!purchase) notFound();
-
-  const returnedAgg = await prisma.purchaseReturnLine.groupBy({
-    by: ["purchaseLineId"],
-    where: { purchaseReturn: { purchaseId: id, storeId } },
-    _sum: { qty: true },
-  });
-  const returnedByLine = new Map<string, number>();
-  for (const row of returnedAgg) {
-    returnedByLine.set(row.purchaseLineId, row._sum.qty ?? 0);
-  }
-
-  const [priorReturns, returnTotalsAgg] = await Promise.all([
+    }),
+    prisma.purchaseReturnLine.groupBy({
+      by: ["purchaseLineId"],
+      where: { purchaseReturn: { purchaseId: id, storeId } },
+      _sum: { qty: true },
+    }),
     prisma.purchaseReturn.findMany({
       where: { purchaseId: id, storeId },
       orderBy: { createdAt: "desc" },
@@ -62,6 +55,12 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
       _sum: { total: true },
     }),
   ]);
+  if (!purchase) notFound();
+
+  const returnedByLine = new Map<string, number>();
+  for (const row of returnedAgg) {
+    returnedByLine.set(row.purchaseLineId, row._sum.qty ?? 0);
+  }
   const returnCreditsTotal = Number(returnTotalsAgg._sum.total ?? 0);
   const hasReturnableQty = purchase.lines.some((line) => {
     const returned = returnedByLine.get(line.id) ?? 0;

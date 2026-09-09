@@ -31,42 +31,42 @@ export async function GET(
   const ctx = await getAuthContext();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
+  const storeId = ctx.activeStoreId;
 
-  const sale = await prisma.sale.findFirst({
-    where: { id, storeId: ctx.activeStoreId },
-    include: {
-      store: true,
-      createdBy: { select: { name: true } },
-      lines: {
-        include: {
-          product: true,
-          lot: { select: { batchNo: true, expiryDate: true, mrp: true, costPrice: true, quantity: true } },
+  const [sale, returnedAgg, returnTotalsAgg] = await Promise.all([
+    prisma.sale.findFirst({
+      where: { id, storeId },
+      include: {
+        store: { select: { name: true, phone: true, address: true, gstin: true } },
+        createdBy: { select: { name: true } },
+        lines: {
+          include: {
+            product: { select: { sku: true, name: true, packSize: true } },
+            lot: { select: { batchNo: true, expiryDate: true, mrp: true, costPrice: true, quantity: true } },
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.saleReturnLine.groupBy({
+      by: ["saleLineId"],
+      where: { saleReturn: { saleId: id, storeId } },
+      _sum: { qty: true },
+    }),
+    prisma.saleReturn.aggregate({
+      where: { saleId: id, storeId },
+      _sum: { total: true },
+      _count: true,
+    }),
+  ]);
   if (!sale) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const returnedAgg = await prisma.saleReturnLine.groupBy({
-    by: ["saleLineId"],
-    where: { saleReturn: { saleId: id, storeId: ctx.activeStoreId } },
-    _sum: { qty: true },
-  });
   const returnedByLine = new Map<string, number>();
   for (const row of returnedAgg) {
     returnedByLine.set(row.saleLineId, row._sum.qty ?? 0);
   }
 
-  const [returnTotalsAgg, returnCountAll] = await Promise.all([
-    prisma.saleReturn.aggregate({
-      where: { saleId: id, storeId: ctx.activeStoreId },
-      _sum: { total: true },
-    }),
-    prisma.saleReturn.count({
-      where: { saleId: id, storeId: ctx.activeStoreId },
-    }),
-  ]);
   const returnCreditsTotal = Number(returnTotalsAgg._sum.total ?? 0);
+  const returnCountAll = returnTotalsAgg._count;
   const billGross = Number(sale.total);
   const netTotal = netSaleTotal(billGross, returnCreditsTotal);
 

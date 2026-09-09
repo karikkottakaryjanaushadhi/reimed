@@ -38,39 +38,38 @@ export async function GET(
 
   const { id } = await params;
   const storeId = ctx.activeStoreId;
-  const purchase = await prisma.purchase.findFirst({
-    where: { id, storeId },
-    include: {
-      supplier: { select: { id: true, name: true } },
-      createdBy: { select: { name: true, email: true } },
-      lines: {
-        include: { product: { select: { id: true, name: true, sku: true } } },
-        orderBy: { id: "asc" },
+  const [purchase, returnedAgg, returnTotalsAgg] = await Promise.all([
+    prisma.purchase.findFirst({
+      where: { id, storeId },
+      include: {
+        supplier: { select: { id: true, name: true } },
+        createdBy: { select: { name: true, email: true } },
+        lines: {
+          include: { product: { select: { id: true, name: true, sku: true } } },
+          orderBy: { id: "asc" },
+        },
       },
-    },
-  });
+    }),
+    prisma.purchaseReturnLine.groupBy({
+      by: ["purchaseLineId"],
+      where: { purchaseReturn: { purchaseId: id, storeId } },
+      _sum: { qty: true },
+    }),
+    prisma.purchaseReturn.aggregate({
+      where: { purchaseId: id, storeId },
+      _sum: { total: true },
+      _count: true,
+    }),
+  ]);
   if (!purchase) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const returnedAgg = await prisma.purchaseReturnLine.groupBy({
-    by: ["purchaseLineId"],
-    where: { purchaseReturn: { purchaseId: id, storeId } },
-    _sum: { qty: true },
-  });
   const returnedByLine = new Map<string, number>();
   for (const row of returnedAgg) {
     returnedByLine.set(row.purchaseLineId, row._sum.qty ?? 0);
   }
 
-  const [returnTotalsAgg, returnCount] = await Promise.all([
-    prisma.purchaseReturn.aggregate({
-      where: { purchaseId: id, storeId },
-      _sum: { total: true },
-    }),
-    prisma.purchaseReturn.count({
-      where: { purchaseId: id, storeId },
-    }),
-  ]);
   const returnCreditsTotal = Number(returnTotalsAgg._sum.total ?? 0);
+  const returnCount = returnTotalsAgg._count;
 
   const billTotals = purchaseBillTotalsFromLines(
     purchase.lines.map((line) => ({

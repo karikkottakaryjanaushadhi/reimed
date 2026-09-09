@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { parseAppYmdEnd, parseAppYmdStart } from "@/lib/app-timezone";
 
 function parseAppDateTime(raw: string): Date | undefined {
@@ -47,4 +47,24 @@ export function createdAtDayRange(
 
 export function trimDateParam(raw: unknown): string {
   return typeof raw === "string" ? raw.trim() : "";
+}
+
+/** Equality fragments for a Prisma datetime filter (no leading AND). */
+export function sqlDateTimeRangeParts(column: Prisma.Sql, range?: Prisma.DateTimeFilter): Prisma.Sql[] {
+  if (!range) return [];
+  const parts: Prisma.Sql[] = [];
+  if (range.gte) parts.push(Prisma.sql`${column} >= ${range.gte}`);
+  if (range.lte) parts.push(Prisma.sql`${column} <= ${range.lte}`);
+  return parts;
+}
+
+/** `AND col >= from AND col <= to` from a Prisma datetime filter, or empty. */
+export function sqlAndDateTimeRange(column: Prisma.Sql, range?: Prisma.DateTimeFilter): Prisma.Sql {
+  const parts = sqlDateTimeRangeParts(column, range);
+  if (parts.length === 0) return Prisma.empty;
+  return Prisma.sql`AND ${Prisma.join(parts, " AND ")}`;
+}
+
+export function sqlIlikePattern(raw: string): string {
+  return `%${raw.trim()}%`;
 }

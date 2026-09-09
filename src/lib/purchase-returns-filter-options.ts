@@ -1,5 +1,5 @@
-import type { Prisma } from "@prisma/client";
-import { createdAtDayRange } from "@/lib/date-range-filter";
+import { Prisma } from "@prisma/client";
+import { createdAtDayRange, sqlDateTimeRangeParts, sqlIlikePattern } from "@/lib/date-range-filter";
 import { prisma } from "@/lib/prisma";
 import { withServerTimedCache } from "@/lib/server-timed-cache";
 
@@ -70,6 +70,52 @@ export function buildPurchaseReturnFilterWhere(
   return { AND: parts };
 }
 
+function purchaseReturnLineExistsSql(
+  params: PurchaseReturnFilterParams,
+  exclude?: PurchaseReturnFilterExclude,
+): Prisma.Sql | null {
+  const product = exclude === "product" ? "" : params.product?.trim() ?? "";
+  const batch = params.batch?.trim() ?? "";
+  if (!product && !batch) return null;
+  const lineParts: Prisma.Sql[] = [Prisma.sql`prl."purchaseReturnId" = pr."id"`];
+  if (product) lineParts.push(Prisma.sql`prod."name" ILIKE ${sqlIlikePattern(product)}`);
+  if (batch) lineParts.push(Prisma.sql`pl."batchNo" ILIKE ${sqlIlikePattern(batch)}`);
+  return Prisma.sql`EXISTS (
+    SELECT 1
+    FROM "PurchaseReturnLine" prl
+    INNER JOIN "PurchaseLine" pl ON pl."id" = prl."purchaseLineId"
+    INNER JOIN "Product" prod ON prod."id" = pl."productId"
+    WHERE ${Prisma.join(lineParts, " AND ")}
+  )`;
+}
+
+function purchaseReturnFilterAndSql(params: PurchaseReturnFilterParams, exclude?: PurchaseReturnFilterExclude) {
+  const dateFilter = createdAtDayRange(params.from || undefined, params.to || undefined);
+  const parts: Prisma.Sql[] = [
+    Prisma.sql`pr."storeId" = ${params.storeId}`,
+    ...sqlDateTimeRangeParts(Prisma.sql`pr."createdAt"`, dateFilter),
+  ];
+
+  const purchaseNoRaw = params.purchaseNo?.trim() ?? "";
+  if (purchaseNoRaw) {
+    const n = parsePositiveInt(purchaseNoRaw);
+    parts.push(Prisma.sql`p."purchaseNo" = ${n ?? -1}`);
+  }
+  if (exclude !== "supplier" && params.supplier?.trim()) {
+    parts.push(Prisma.sql`s."name" ILIKE ${sqlIlikePattern(params.supplier)}`);
+  }
+  const creditNote = params.creditNote?.trim() ?? "";
+  if (creditNote) {
+    parts.push(Prisma.sql`pr."creditNoteNo" ILIKE ${sqlIlikePattern(creditNote)}`);
+  }
+  const lineExists = purchaseReturnLineExistsSql(params, exclude);
+  if (lineExists) parts.push(lineExists);
+  if (exclude !== "recordedBy" && params.recordedBy?.trim()) {
+    parts.push(Prisma.sql`u."name" ILIKE ${sqlIlikePattern(params.recordedBy)}`);
+  }
+  return Prisma.join(parts, " AND ");
+}
+
 export async function getPurchaseReturnFilterOptions(params: PurchaseReturnFilterParams) {
   return withServerTimedCache(
     "purchase-return-filter-options",
@@ -86,35 +132,47 @@ export async function getPurchaseReturnFilterOptions(params: PurchaseReturnFilte
     },
     20_000,
     async () => {
-      const supplierWhere = buildPurchaseReturnFilterWhere(params, "supplier");
-      const productWhere = buildPurchaseReturnFilterWhere(params, "product");
-      const recordedByWhere = buildPurchaseReturnFilterWhere(params, "recordedBy");
+      const supplierWhere = purchaseReturnFilterAndSql(params, "supplier");
+      const productWhere = purchaseReturnFilterAndSql(params, "product");
+      const recordedByWhere = purchaseReturnFilterAndSql(params, "recordedBy");
 
       const [supplierRows, productRows, recordedByRows] = await Promise.all([
-        prisma.purchase.findMany({
-          where: { returns: { some: supplierWhere } },
-          distinct: ["supplierId"],
-          select: { supplier: { select: { name: true } } },
-          orderBy: { supplier: { name: "asc" } },
-        }),
-        prisma.purchaseLine.findMany({
-          where: { returnLines: { some: { purchaseReturn: productWhere } } },
-          distinct: ["productId"],
-          select: { product: { select: { name: true } } },
-          orderBy: { product: { name: "asc" } },
-        }),
-        prisma.purchaseReturn.findMany({
-          where: recordedByWhere,
-          distinct: ["createdById"],
-          select: { createdBy: { select: { name: true } } },
-          orderBy: { createdBy: { name: "asc" } },
-        }),
+        prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
+          SELECT DISTINCT s."name" AS "name"
+          FROM "PurchaseReturn" pr
+          INNER JOIN "Purchase" p ON p."id" = pr."purchaseId"
+          INNER JOIN "Supplier" s ON s."id" = p."supplierId"
+          INNER JOIN "User" u ON u."id" = pr."createdById"
+          WHERE ${supplierWhere}
+          ORDER BY s."name" ASC
+        `),
+        prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
+          SELECT DISTINCT prod."name" AS "name"
+          FROM "PurchaseReturn" pr
+          INNER JOIN "Purchase" p ON p."id" = pr."purchaseId"
+          INNER JOIN "Supplier" s ON s."id" = p."supplierId"
+          INNER JOIN "User" u ON u."id" = pr."createdById"
+          INNER JOIN "PurchaseReturnLine" prl ON prl."purchaseReturnId" = pr."id"
+          INNER JOIN "PurchaseLine" pl ON pl."id" = prl."purchaseLineId"
+          INNER JOIN "Product" prod ON prod."id" = pl."productId"
+          WHERE ${productWhere}
+          ORDER BY prod."name" ASC
+        `),
+        prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
+          SELECT DISTINCT u."name" AS "name"
+          FROM "PurchaseReturn" pr
+          INNER JOIN "Purchase" p ON p."id" = pr."purchaseId"
+          INNER JOIN "Supplier" s ON s."id" = p."supplierId"
+          INNER JOIN "User" u ON u."id" = pr."createdById"
+          WHERE ${recordedByWhere}
+          ORDER BY u."name" ASC
+        `),
       ]);
 
       return {
-        suppliers: supplierRows.map((r) => r.supplier.name),
-        products: productRows.map((r) => r.product.name),
-        recordedBy: recordedByRows.map((r) => r.createdBy.name),
+        suppliers: supplierRows.map((r) => r.name),
+        products: productRows.map((r) => r.name),
+        recordedBy: recordedByRows.map((r) => r.name),
       };
     },
   );

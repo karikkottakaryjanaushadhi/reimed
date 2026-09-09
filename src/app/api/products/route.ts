@@ -50,9 +50,38 @@ export async function GET(req: Request) {
   const skuSearchSql =
     searchSku && codePat ? Prisma.sql`OR lower(p."sku") LIKE ${codePat}` : Prisma.empty;
 
-  const idRows = await prisma.$queryRaw<Array<{ id: string }>>(
+  const found = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      sku: string;
+      name: string;
+      genericName: string | null;
+      productCategory: string;
+      productType: string;
+      productSchedule: string;
+      packSize: number;
+      gstPct: unknown;
+      reorderMin: number;
+      brandId: string | null;
+      brandIdJoin: string | null;
+      brandName: string | null;
+    }>
+  >(
     Prisma.sql`
-      SELECT p."id" AS "id" FROM "Product" p
+      SELECT p."id" AS "id",
+             p."sku" AS "sku",
+             p."name" AS "name",
+             p."genericName" AS "genericName",
+             p."productCategory" AS "productCategory",
+             p."productType" AS "productType",
+             p."productSchedule" AS "productSchedule",
+             p."packSize" AS "packSize",
+             p."gstPct" AS "gstPct",
+             p."reorderMin" AS "reorderMin",
+             p."brandId" AS "brandId",
+             br."id" AS "brandIdJoin",
+             br."name" AS "brandName"
+      FROM "Product" p
       LEFT JOIN "Brand" br ON br."id" = p."brandId"
       WHERE replace(lower(p."name"), ' ', '') LIKE ${likePat}
          OR replace(lower(COALESCE(br."name", '')), ' ', '') LIKE ${likePat}
@@ -62,29 +91,21 @@ export async function GET(req: Request) {
     `,
   );
 
-  const candidateIds = [...new Set(idRows.map((r) => r.id))];
-  if (candidateIds.length === 0) {
-    return NextResponse.json({ products: [] });
-  }
-
-  const found = await prisma.product.findMany({
-    where: { id: { in: candidateIds } },
-    select: {
-      id: true,
-      sku: true,
-      name: true,
-      genericName: true,
-      productCategory: true,
-      productType: true,
-      productSchedule: true,
-      packSize: true,
-      gstPct: true,
-      reorderMin: true,
-      brandId: true,
-      brand: { select: { id: true, name: true } },
-    },
-  });
-  const products = sortByProductSearchRelevance(found, q, (p) => p.name).slice(0, 50);
+  const mapped = found.map((p) => ({
+    id: p.id,
+    sku: p.sku,
+    name: p.name,
+    genericName: p.genericName,
+    productCategory: p.productCategory,
+    productType: p.productType,
+    productSchedule: p.productSchedule,
+    packSize: p.packSize,
+    gstPct: p.gstPct,
+    reorderMin: p.reorderMin,
+    brandId: p.brandId,
+    brand: p.brandIdJoin && p.brandName ? { id: p.brandIdJoin, name: p.brandName } : null,
+  }));
+  const products = sortByProductSearchRelevance(mapped, q, (p) => p.name).slice(0, 50);
 
   return NextResponse.json({ products });
 }

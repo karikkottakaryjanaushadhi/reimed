@@ -92,36 +92,58 @@ export default async function PurchaseReturnsLogPage({
     recordedBy: recordedBy || undefined,
   };
   const where = buildPurchaseReturnFilterWhere(filterParams);
+  const skipGuess = (rawPage - 1) * limit;
 
-  const [filterOptions, total, creditAgg] = await Promise.all([
+  const [filterOptions, total, creditAgg, returnsGuess] = await Promise.all([
     getPurchaseReturnFilterOptions(filterParams),
     prisma.purchaseReturn.count({ where }),
     prisma.purchaseReturn.aggregate({ where, _sum: { total: true } }),
+    prisma.purchaseReturn.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: skipGuess,
+      take: limit,
+      include: {
+        purchase: {
+          select: {
+            id: true,
+            purchaseNo: true,
+            supplier: { select: { name: true } },
+          },
+        },
+        createdBy: { select: { name: true } },
+        lines: {
+          select: { purchaseLine: { select: { product: { select: { id: true, name: true } } } } },
+        },
+      },
+    }),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const page = Math.min(rawPage, totalPages);
   const skip = (page - 1) * limit;
-
-  const returns = await prisma.purchaseReturn.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    skip,
-    take: limit,
-    include: {
-      purchase: {
-        select: {
-          id: true,
-          purchaseNo: true,
-          supplier: { select: { name: true } },
-        },
-      },
-      createdBy: { select: { name: true } },
-      lines: {
-        select: { purchaseLine: { select: { product: { select: { id: true, name: true } } } } },
-      },
-    },
-  });
+  const returns =
+    skip === skipGuess
+      ? returnsGuess
+      : await prisma.purchaseReturn.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: limit,
+          include: {
+            purchase: {
+              select: {
+                id: true,
+                purchaseNo: true,
+                supplier: { select: { name: true } },
+              },
+            },
+            createdBy: { select: { name: true } },
+            lines: {
+              select: { purchaseLine: { select: { product: { select: { id: true, name: true } } } } },
+            },
+          },
+        });
 
   const creditTotal = Number(creditAgg._sum.total ?? 0);
   const extras = purchaseReturnListExtras(

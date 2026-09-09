@@ -83,30 +83,46 @@ export default async function SalesReturnsLogPage({
     recordedBy: recordedBy || undefined,
   };
   const where = buildSaleReturnFilterWhere(filterParams);
+  const skipGuess = (rawPage - 1) * limit;
 
-  const [filterOptions, total, creditAgg] = await Promise.all([
+  const [filterOptions, total, creditAgg, returnsGuess] = await Promise.all([
     getSaleReturnFilterOptions(filterParams),
     prisma.saleReturn.count({ where }),
     prisma.saleReturn.aggregate({ where, _sum: { total: true } }),
+    prisma.saleReturn.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: skipGuess,
+      take: limit,
+      include: {
+        sale: { select: { id: true, billNo: true } },
+        createdBy: { select: { name: true } },
+        lines: {
+          select: { saleLine: { select: { product: { select: { id: true, name: true } } } } },
+        },
+      },
+    }),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const page = Math.min(rawPage, totalPages);
   const skip = (page - 1) * limit;
-
-  const returns = await prisma.saleReturn.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    skip,
-    take: limit,
-    include: {
-      sale: { select: { id: true, billNo: true } },
-      createdBy: { select: { name: true } },
-      lines: {
-        select: { saleLine: { select: { product: { select: { id: true, name: true } } } } },
-      },
-    },
-  });
+  const returns =
+    skip === skipGuess
+      ? returnsGuess
+      : await prisma.saleReturn.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: limit,
+          include: {
+            sale: { select: { id: true, billNo: true } },
+            createdBy: { select: { name: true } },
+            lines: {
+              select: { saleLine: { select: { product: { select: { id: true, name: true } } } } },
+            },
+          },
+        });
 
   const creditTotal = Number(creditAgg._sum.total ?? 0);
   const extras = saleReturnListExtras(from, to, billNo, patient, doctor, product, batch, recordedBy, limit);

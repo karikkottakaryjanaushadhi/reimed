@@ -36,12 +36,13 @@ export async function GET(req: Request) {
   const expiringWithinDays = Number(searchParams.get("expiringWithin") ?? "90");
   const productId = searchParams.get("productId")?.trim();
   const inStockOnly = searchParams.get("inStockOnly") === "1";
+  if (!productId) return NextResponse.json({ lots: [] });
   const today = startOfDay(new Date());
 
   const lots = await prisma.inventoryLot.findMany({
     where: {
       storeId: ctx.activeStoreId,
-      ...(productId ? { productId } : {}),
+      productId,
       ...(inStockOnly ? { quantity: { gt: 0 } } : {}),
     },
     select: {

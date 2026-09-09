@@ -1,5 +1,5 @@
-import type { Prisma } from "@prisma/client";
-import { createdAtDatetimeRange } from "@/lib/date-range-filter";
+import { Prisma } from "@prisma/client";
+import { createdAtDatetimeRange, sqlDateTimeRangeParts, sqlIlikePattern } from "@/lib/date-range-filter";
 import { prisma } from "@/lib/prisma";
 import { withServerTimedCache } from "@/lib/server-timed-cache";
 
@@ -46,6 +46,32 @@ export function buildSalesFilterWhere(
   return where;
 }
 
+function salesFilterAndSql(params: SalesFilterParams, exclude?: SalesFilterExclude) {
+  const dateFilter = createdAtDatetimeRange(params.from || undefined, params.to || undefined);
+  const parts: Prisma.Sql[] = [
+    Prisma.sql`s."storeId" = ${params.storeId}`,
+    ...sqlDateTimeRangeParts(Prisma.sql`s."createdAt"`, dateFilter),
+  ];
+  if (exclude !== "doctor" && params.doctor?.trim()) {
+    parts.push(Prisma.sql`s."doctorName" ILIKE ${sqlIlikePattern(params.doctor)}`);
+  }
+  if (exclude !== "patient" && params.patient?.trim()) {
+    parts.push(Prisma.sql`s."customerName" ILIKE ${sqlIlikePattern(params.patient)}`);
+  }
+  if (exclude !== "product" && params.product?.trim()) {
+    parts.push(Prisma.sql`EXISTS (
+      SELECT 1
+      FROM "SaleLine" sl
+      INNER JOIN "Product" p ON p."id" = sl."productId"
+      WHERE sl."saleId" = s."id" AND p."name" ILIKE ${sqlIlikePattern(params.product)}
+    )`);
+  }
+  if (params.unpaid) {
+    parts.push(Prisma.sql`s."paid" = FALSE`);
+  }
+  return Prisma.join(parts, " AND ");
+}
+
 export async function getSalesFilterOptions(params: SalesFilterParams) {
   return withServerTimedCache(
     "sales-filter-options",
@@ -60,35 +86,37 @@ export async function getSalesFilterOptions(params: SalesFilterParams) {
     },
     20_000,
     async () => {
-      const doctorWhere = buildSalesFilterWhere(params, "doctor");
-      const patientWhere = buildSalesFilterWhere(params, "patient");
-      const productSaleWhere = buildSalesFilterWhere(params, "product");
+      const doctorWhere = salesFilterAndSql(params, "doctor");
+      const patientWhere = salesFilterAndSql(params, "patient");
+      const productSaleWhere = salesFilterAndSql(params, "product");
 
       const [doctorRows, patientRows, productRows] = await Promise.all([
-        prisma.sale.findMany({
-          where: { ...doctorWhere, doctorName: { not: null } },
-          distinct: ["doctorName"],
-          select: { doctorName: true },
-          orderBy: { doctorName: "asc" },
-        }),
-        prisma.sale.findMany({
-          where: { ...patientWhere, customerName: { not: null } },
-          distinct: ["customerName"],
-          select: { customerName: true },
-          orderBy: { customerName: "asc" },
-        }),
-        prisma.saleLine.findMany({
-          where: { sale: productSaleWhere },
-          distinct: ["productId"],
-          select: { product: { select: { name: true } } },
-          orderBy: { product: { name: "asc" } },
-        }),
+        prisma.$queryRaw<Array<{ name: string | null }>>(Prisma.sql`
+          SELECT DISTINCT s."doctorName" AS "name"
+          FROM "Sale" s
+          WHERE s."doctorName" IS NOT NULL AND ${doctorWhere}
+          ORDER BY s."doctorName" ASC
+        `),
+        prisma.$queryRaw<Array<{ name: string | null }>>(Prisma.sql`
+          SELECT DISTINCT s."customerName" AS "name"
+          FROM "Sale" s
+          WHERE s."customerName" IS NOT NULL AND ${patientWhere}
+          ORDER BY s."customerName" ASC
+        `),
+        prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
+          SELECT DISTINCT p."name" AS "name"
+          FROM "SaleLine" sl
+          INNER JOIN "Product" p ON p."id" = sl."productId"
+          INNER JOIN "Sale" s ON s."id" = sl."saleId"
+          WHERE ${productSaleWhere}
+          ORDER BY p."name" ASC
+        `),
       ]);
 
       return {
-        doctors: doctorRows.map((r) => r.doctorName ?? "").filter(Boolean),
-        patients: patientRows.map((r) => r.customerName ?? "").filter(Boolean),
-        products: productRows.map((r) => r.product.name),
+        doctors: doctorRows.map((r) => r.name ?? "").filter(Boolean),
+        patients: patientRows.map((r) => r.name ?? "").filter(Boolean),
+        products: productRows.map((r) => r.name),
       };
     },
   );
@@ -104,14 +132,16 @@ export async function getProductwiseProductOptions(params: Pick<SalesFilterParam
     },
     20_000,
     async () => {
-      const saleWhere = buildSalesFilterWhere(params);
-      const rows = await prisma.saleLine.findMany({
-        where: { sale: saleWhere },
-        distinct: ["productId"],
-        select: { product: { select: { name: true } } },
-        orderBy: { product: { name: "asc" } },
-      });
-      return rows.map((r) => r.product.name);
+      const saleWhere = salesFilterAndSql(params);
+      const rows = await prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
+        SELECT DISTINCT p."name" AS "name"
+        FROM "SaleLine" sl
+        INNER JOIN "Product" p ON p."id" = sl."productId"
+        INNER JOIN "Sale" s ON s."id" = sl."saleId"
+        WHERE ${saleWhere}
+        ORDER BY p."name" ASC
+      `);
+      return rows.map((r) => r.name);
     },
   );
 }

@@ -3,6 +3,8 @@ import { gstPctNumber } from "@/lib/product-gst-slabs";
 import { prisma } from "@/lib/prisma";
 import type { ProductListRow } from "@/lib/product-list-row";
 import {
+  productCatalogLotJoin,
+  productCatalogStockExpr,
   productCatalogWhereParts,
   type ProductStockFilter,
 } from "@/lib/products-filter-options";
@@ -35,8 +37,7 @@ export type ProductListQueryParams = {
   dir?: string;
 };
 
-function productSortOrder(sort: ProductListSort, dir: "asc" | "desc", storeId: string) {
-  const stockExpr = Prisma.sql`COALESCE(SUM(il."quantity") FILTER (WHERE il."storeId" = ${storeId}), 0)`;
+function productSortOrder(sort: ProductListSort, dir: "asc" | "desc") {
   const tiebreak = Prisma.sql`, p."name" ASC, p."id" ASC`;
   switch (sort) {
     case "sku":
@@ -54,7 +55,7 @@ function productSortOrder(sort: ProductListSort, dir: "asc" | "desc", storeId: s
     case "gst":
       return Prisma.sql`p."gstPct" ${Prisma.raw(dir)}${tiebreak}`;
     case "stock":
-      return Prisma.sql`${stockExpr} ${Prisma.raw(dir)}${tiebreak}`;
+      return Prisma.sql`${productCatalogStockExpr} ${Prisma.raw(dir)}${tiebreak}`;
     case "name":
     default:
       return Prisma.sql`p."name" ${Prisma.raw(dir)}, p."id" ASC`;
@@ -92,19 +93,19 @@ function buildProductListSql(params: ProductListQueryParams) {
   const sort = parseProductListSort(params.sort);
   const dir = parseProductListDir(params.dir);
   const storeId = params.storeId;
-  const stockExpr = Prisma.sql`COALESCE(SUM(il."quantity") FILTER (WHERE il."storeId" = ${storeId}), 0)`;
   const whereSql = Prisma.join(productCatalogWhereParts(params), " AND ");
+  const lotJoin = productCatalogLotJoin(storeId);
 
   let havingSql = Prisma.empty;
   if (stock === "low") {
-    havingSql = Prisma.sql`HAVING ${stockExpr} <= p."reorderMin" AND p."reorderMin" > 0`;
+    havingSql = Prisma.sql`HAVING ${productCatalogStockExpr} <= p."reorderMin" AND p."reorderMin" > 0`;
   } else if (stock === "out") {
-    havingSql = Prisma.sql`HAVING ${stockExpr} = 0`;
+    havingSql = Prisma.sql`HAVING ${productCatalogStockExpr} = 0`;
   } else if (stock === "in") {
-    havingSql = Prisma.sql`HAVING ${stockExpr} > 0`;
+    havingSql = Prisma.sql`HAVING ${productCatalogStockExpr} > 0`;
   }
 
-  return { whereSql, havingSql, stockExpr, sort, dir, storeId };
+  return { whereSql, havingSql, lotJoin, sort, dir };
 }
 
 function mapProductListRows(
@@ -136,7 +137,7 @@ function mapProductListRows(
 }
 
 export async function countProductList(params: ProductListQueryParams): Promise<number> {
-  const { whereSql, havingSql } = buildProductListSql(params);
+  const { whereSql, havingSql, lotJoin } = buildProductListSql(params);
   const countRows = await prisma.$queryRaw<Array<{ count: bigint }>>(
     Prisma.sql`
       SELECT COUNT(*)::bigint AS "count"
@@ -144,7 +145,7 @@ export async function countProductList(params: ProductListQueryParams): Promise<
         SELECT p."id"
         FROM "Product" p
         LEFT JOIN "Brand" b ON b."id" = p."brandId"
-        LEFT JOIN "InventoryLot" il ON il."productId" = p."id"
+        ${lotJoin}
         LEFT JOIN "Supplier" s ON s."id" = il."supplierId"
         WHERE ${whereSql}
         GROUP BY p."id", p."reorderMin"
@@ -158,7 +159,7 @@ export async function countProductList(params: ProductListQueryParams): Promise<
 export async function queryProductList(
   params: ProductListQueryParams & { limit?: number; offset?: number },
 ): Promise<ProductListRow[]> {
-  const { whereSql, havingSql, stockExpr, sort, dir, storeId } = buildProductListSql(params);
+  const { whereSql, havingSql, lotJoin, sort, dir } = buildProductListSql(params);
   const pagingSql =
     params.limit != null
       ? Prisma.sql`LIMIT ${params.limit} OFFSET ${params.offset ?? 0}`
@@ -187,16 +188,16 @@ export async function queryProductList(
              p."reorderMin" AS "reorderMin",
              p."gstPct" AS "gstPct",
              b."name" AS "brandName",
-             ${stockExpr}::int AS "stockQty",
+             ${productCatalogStockExpr}::int AS "stockQty",
              NULLIF(string_agg(DISTINCT s."name", ', '), '') AS "suppliers"
       FROM "Product" p
       LEFT JOIN "Brand" b ON b."id" = p."brandId"
-      LEFT JOIN "InventoryLot" il ON il."productId" = p."id"
+      ${lotJoin}
       LEFT JOIN "Supplier" s ON s."id" = il."supplierId"
       WHERE ${whereSql}
       GROUP BY p."id", p."sku", p."name", p."genericName", p."productCategory", p."productType", p."productSchedule", p."brandId", p."packSize", p."reorderMin", p."gstPct", b."name"
       ${havingSql}
-      ORDER BY ${productSortOrder(sort, dir, storeId)}
+      ORDER BY ${productSortOrder(sort, dir)}
       ${pagingSql}
     `,
   );

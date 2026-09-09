@@ -1,5 +1,5 @@
-import type { Prisma } from "@prisma/client";
-import { createdAtDayRange } from "@/lib/date-range-filter";
+import { Prisma } from "@prisma/client";
+import { createdAtDayRange, sqlDateTimeRangeParts, sqlIlikePattern } from "@/lib/date-range-filter";
 import { prisma } from "@/lib/prisma";
 import { withServerTimedCache } from "@/lib/server-timed-cache";
 
@@ -68,6 +68,52 @@ export function buildSaleReturnFilterWhere(
   return { AND: parts };
 }
 
+function saleReturnLineExistsSql(
+  params: SaleReturnFilterParams,
+  exclude?: SaleReturnFilterExclude,
+): Prisma.Sql | null {
+  const product = exclude === "product" ? "" : params.product?.trim() ?? "";
+  const batch = params.batch?.trim() ?? "";
+  if (!product && !batch) return null;
+  const lineParts: Prisma.Sql[] = [Prisma.sql`srl."saleReturnId" = sr."id"`];
+  if (product) lineParts.push(Prisma.sql`prod."name" ILIKE ${sqlIlikePattern(product)}`);
+  if (batch) lineParts.push(Prisma.sql`lot."batchNo" ILIKE ${sqlIlikePattern(batch)}`);
+  return Prisma.sql`EXISTS (
+    SELECT 1
+    FROM "SaleReturnLine" srl
+    INNER JOIN "SaleLine" sl ON sl."id" = srl."saleLineId"
+    INNER JOIN "Product" prod ON prod."id" = sl."productId"
+    INNER JOIN "InventoryLot" lot ON lot."id" = sl."lotId"
+    WHERE ${Prisma.join(lineParts, " AND ")}
+  )`;
+}
+
+function saleReturnFilterAndSql(params: SaleReturnFilterParams, exclude?: SaleReturnFilterExclude) {
+  const dateFilter = createdAtDayRange(params.from || undefined, params.to || undefined);
+  const parts: Prisma.Sql[] = [
+    Prisma.sql`sr."storeId" = ${params.storeId}`,
+    ...sqlDateTimeRangeParts(Prisma.sql`sr."createdAt"`, dateFilter),
+  ];
+
+  const billNoRaw = params.billNo?.trim() ?? "";
+  if (billNoRaw) {
+    const n = parsePositiveInt(billNoRaw);
+    parts.push(Prisma.sql`s."billNo" = ${n ?? -1}`);
+  }
+  if (exclude !== "patient" && params.patient?.trim()) {
+    parts.push(Prisma.sql`s."customerName" ILIKE ${sqlIlikePattern(params.patient)}`);
+  }
+  if (exclude !== "doctor" && params.doctor?.trim()) {
+    parts.push(Prisma.sql`s."doctorName" ILIKE ${sqlIlikePattern(params.doctor)}`);
+  }
+  const lineExists = saleReturnLineExistsSql(params, exclude);
+  if (lineExists) parts.push(lineExists);
+  if (exclude !== "recordedBy" && params.recordedBy?.trim()) {
+    parts.push(Prisma.sql`u."name" ILIKE ${sqlIlikePattern(params.recordedBy)}`);
+  }
+  return Prisma.join(parts, " AND ");
+}
+
 export async function getSaleReturnFilterOptions(params: SaleReturnFilterParams) {
   return withServerTimedCache(
     "sale-return-filter-options",
@@ -84,43 +130,54 @@ export async function getSaleReturnFilterOptions(params: SaleReturnFilterParams)
     },
     20_000,
     async () => {
-      const productWhere = buildSaleReturnFilterWhere(params, "product");
-      const patientWhere = buildSaleReturnFilterWhere(params, "patient");
-      const doctorWhere = buildSaleReturnFilterWhere(params, "doctor");
-      const recordedByWhere = buildSaleReturnFilterWhere(params, "recordedBy");
+      const productWhere = saleReturnFilterAndSql(params, "product");
+      const patientWhere = saleReturnFilterAndSql(params, "patient");
+      const doctorWhere = saleReturnFilterAndSql(params, "doctor");
+      const recordedByWhere = saleReturnFilterAndSql(params, "recordedBy");
 
       const [productRows, patientRows, doctorRows, recordedByRows] = await Promise.all([
-        prisma.saleLine.findMany({
-          where: { returnLines: { some: { saleReturn: productWhere } } },
-          distinct: ["productId"],
-          select: { product: { select: { name: true } } },
-          orderBy: { product: { name: "asc" } },
-        }),
-        prisma.sale.findMany({
-          where: { customerName: { not: null }, returns: { some: patientWhere } },
-          distinct: ["customerName"],
-          select: { customerName: true },
-          orderBy: { customerName: "asc" },
-        }),
-        prisma.sale.findMany({
-          where: { doctorName: { not: null }, returns: { some: doctorWhere } },
-          distinct: ["doctorName"],
-          select: { doctorName: true },
-          orderBy: { doctorName: "asc" },
-        }),
-        prisma.saleReturn.findMany({
-          where: recordedByWhere,
-          distinct: ["createdById"],
-          select: { createdBy: { select: { name: true } } },
-          orderBy: { createdBy: { name: "asc" } },
-        }),
+        prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
+          SELECT DISTINCT prod."name" AS "name"
+          FROM "SaleReturn" sr
+          INNER JOIN "Sale" s ON s."id" = sr."saleId"
+          INNER JOIN "User" u ON u."id" = sr."createdById"
+          INNER JOIN "SaleReturnLine" srl ON srl."saleReturnId" = sr."id"
+          INNER JOIN "SaleLine" sl ON sl."id" = srl."saleLineId"
+          INNER JOIN "Product" prod ON prod."id" = sl."productId"
+          WHERE ${productWhere}
+          ORDER BY prod."name" ASC
+        `),
+        prisma.$queryRaw<Array<{ name: string | null }>>(Prisma.sql`
+          SELECT DISTINCT s."customerName" AS "name"
+          FROM "SaleReturn" sr
+          INNER JOIN "Sale" s ON s."id" = sr."saleId"
+          INNER JOIN "User" u ON u."id" = sr."createdById"
+          WHERE s."customerName" IS NOT NULL AND ${patientWhere}
+          ORDER BY s."customerName" ASC
+        `),
+        prisma.$queryRaw<Array<{ name: string | null }>>(Prisma.sql`
+          SELECT DISTINCT s."doctorName" AS "name"
+          FROM "SaleReturn" sr
+          INNER JOIN "Sale" s ON s."id" = sr."saleId"
+          INNER JOIN "User" u ON u."id" = sr."createdById"
+          WHERE s."doctorName" IS NOT NULL AND ${doctorWhere}
+          ORDER BY s."doctorName" ASC
+        `),
+        prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
+          SELECT DISTINCT u."name" AS "name"
+          FROM "SaleReturn" sr
+          INNER JOIN "Sale" s ON s."id" = sr."saleId"
+          INNER JOIN "User" u ON u."id" = sr."createdById"
+          WHERE ${recordedByWhere}
+          ORDER BY u."name" ASC
+        `),
       ]);
 
       return {
-        products: productRows.map((r) => r.product.name),
-        patients: patientRows.map((r) => r.customerName ?? "").filter(Boolean),
-        doctors: doctorRows.map((r) => r.doctorName ?? "").filter(Boolean),
-        recordedBy: recordedByRows.map((r) => r.createdBy.name),
+        products: productRows.map((r) => r.name),
+        patients: patientRows.map((r) => r.name ?? "").filter(Boolean),
+        doctors: doctorRows.map((r) => r.name ?? "").filter(Boolean),
+        recordedBy: recordedByRows.map((r) => r.name),
       };
     },
   );

@@ -38,7 +38,14 @@ export async function aggregateStoreStock(params: {
   sellableOnly?: boolean;
 }): Promise<AggregatedStockRow[]> {
   const q = params.q?.trim() ?? "";
-  let filterProductIds = params.productIds;
+  const todayStart = parseAppYmdStart(formatAppDateYmd());
+  const sellableClause =
+    params.sellableOnly && todayStart
+      ? Prisma.sql`AND il."expiryDate" >= ${todayStart}`
+      : Prisma.sql``;
+
+  let matchedCte = Prisma.empty;
+  let productIdClause = Prisma.sql``;
 
   if (q) {
     const needle = compactSearchKey(q).replace(/%/g, "").replace(/_/g, "");
@@ -48,30 +55,21 @@ export async function aggregateStoreStock(params: {
     const skuSearchSql = codePat
       ? Prisma.sql`OR replace(lower(p."sku"), ' ', '') LIKE ${codePat}`
       : Prisma.empty;
-    const idRows = await prisma.$queryRaw<Array<{ id: string }>>(
-      Prisma.sql`
+    matchedCte = Prisma.sql`
+      WITH matched AS (
         SELECT p."id" AS "id" FROM "Product" p
         WHERE replace(lower(p."name"), ' ', '') LIKE ${likePat}
            OR replace(lower(COALESCE(p."genericName", '')), ' ', '') LIKE ${likePat}
            ${skuSearchSql}
         LIMIT 200
-      `,
-    );
-    filterProductIds = [...new Set(idRows.map((r) => r.id))];
-    if (filterProductIds.length === 0) return [];
-  } else if (!filterProductIds?.length) {
+      )
+    `;
+    productIdClause = Prisma.sql`AND il."productId" IN (SELECT "id" FROM matched)`;
+  } else if (params.productIds?.length) {
+    productIdClause = Prisma.sql`AND il."productId" IN (${Prisma.join(params.productIds)})`;
+  } else {
     return [];
   }
-
-  const productIdClause = filterProductIds?.length
-    ? Prisma.sql`AND il."productId" IN (${Prisma.join(filterProductIds)})`
-    : Prisma.sql``;
-
-  const todayStart = parseAppYmdStart(formatAppDateYmd());
-  const sellableClause =
-    params.sellableOnly && todayStart
-      ? Prisma.sql`AND il."expiryDate" >= ${todayStart}`
-      : Prisma.sql``;
 
   const quantityExpr =
     todayStart && !params.sellableOnly
@@ -103,6 +101,7 @@ export async function aggregateStoreStock(params: {
     }>
   >(
     Prisma.sql`
+      ${matchedCte}
       SELECT
         p."id" AS "productId",
         p."sku" AS "sku",

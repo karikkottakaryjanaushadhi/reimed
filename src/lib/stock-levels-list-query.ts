@@ -136,22 +136,23 @@ export async function resolveStockLevelsFilters(params: {
   const rawBrandId = params.brandId?.trim() ?? "";
 
   let supplierId = "";
-  if (rawSupplierId) {
-    const exists = await prisma.supplier.findFirst({
-      where: { id: rawSupplierId, inventoryLots: { some: { storeId: params.storeId } } },
-      select: { id: true },
-    });
-    if (exists) supplierId = rawSupplierId;
-  }
-
   let brandId = "";
-  if (rawBrandId) {
-    const exists = await prisma.brand.findFirst({
-      where: { id: rawBrandId },
-      select: { id: true },
-    });
-    if (exists) brandId = rawBrandId;
-  }
+  const [supplierRow, brandRow] = await Promise.all([
+    rawSupplierId
+      ? prisma.supplier.findFirst({
+          where: { id: rawSupplierId, inventoryLots: { some: { storeId: params.storeId } } },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+    rawBrandId
+      ? prisma.brand.findFirst({
+          where: { id: rawBrandId },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+  ]);
+  if (supplierRow) supplierId = rawSupplierId;
+  if (brandRow) brandId = rawBrandId;
 
   return {
     q,

@@ -1,5 +1,7 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { withServerTimedCache } from "@/lib/server-timed-cache";
+import { sqlIlikePattern } from "@/lib/date-range-filter";
 
 export const POS_NAME_SUGGESTION_LIMIT = 20;
 const POS_NAME_RECENT_SCAN = 150;
@@ -42,25 +44,29 @@ async function recentPatientNames(storeId: string): Promise<string[]> {
 }
 
 async function matchingDoctorNames(storeId: string, q: string): Promise<string[]> {
-  const rows = await prisma.sale.findMany({
-    where: { storeId, doctorName: { not: null, contains: q, mode: "insensitive" } },
-    distinct: ["doctorName"],
-    select: { doctorName: true },
-    orderBy: { doctorName: "asc" },
-    take: POS_NAME_SUGGESTION_LIMIT,
-  });
-  return rows.map((r) => r.doctorName?.trim() ?? "").filter(Boolean);
+  const rows = await prisma.$queryRaw<Array<{ name: string | null }>>(Prisma.sql`
+    SELECT DISTINCT s."doctorName" AS "name"
+    FROM "Sale" s
+    WHERE s."storeId" = ${storeId}
+      AND s."doctorName" IS NOT NULL
+      AND s."doctorName" ILIKE ${sqlIlikePattern(q)}
+    ORDER BY s."doctorName" ASC
+    LIMIT ${POS_NAME_SUGGESTION_LIMIT}
+  `);
+  return rows.map((r) => r.name?.trim() ?? "").filter(Boolean);
 }
 
 async function matchingPatientNames(storeId: string, q: string): Promise<string[]> {
-  const rows = await prisma.sale.findMany({
-    where: { storeId, customerName: { not: null, contains: q, mode: "insensitive" } },
-    distinct: ["customerName"],
-    select: { customerName: true },
-    orderBy: { customerName: "asc" },
-    take: POS_NAME_SUGGESTION_LIMIT,
-  });
-  return rows.map((r) => r.customerName?.trim() ?? "").filter(Boolean);
+  const rows = await prisma.$queryRaw<Array<{ name: string | null }>>(Prisma.sql`
+    SELECT DISTINCT s."customerName" AS "name"
+    FROM "Sale" s
+    WHERE s."storeId" = ${storeId}
+      AND s."customerName" IS NOT NULL
+      AND s."customerName" ILIKE ${sqlIlikePattern(q)}
+    ORDER BY s."customerName" ASC
+    LIMIT ${POS_NAME_SUGGESTION_LIMIT}
+  `);
+  return rows.map((r) => r.name?.trim() ?? "").filter(Boolean);
 }
 
 /** Recent or prefix-matched doctor/patient names from past bills at this store. */

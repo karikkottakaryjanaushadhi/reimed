@@ -183,16 +183,31 @@ export default async function InventoryStockPage({
   const stockPageSize = parseListLimitParam(sp.slimit);
 
   const storeId = ctx.activeStoreId;
+  const q = typeof sp.q === "string" ? sp.q : "";
+  const rawSupplierId = typeof sp.supplierId === "string" ? sp.supplierId : "";
+  const rawBrandId = typeof sp.brandId === "string" ? sp.brandId : "";
 
-  const resolvedFilters = await resolveStockLevelsFilters({
-    storeId,
-    q: typeof sp.q === "string" ? sp.q : "",
-    supplierId: typeof sp.supplierId === "string" ? sp.supplierId : "",
-    brandId: typeof sp.brandId === "string" ? sp.brandId : "",
-    expiry: expiryRaw,
-    expiryOn: expiryOnRaw,
-    lowStock: lowStockOnly,
-  });
+  const [resolvedFilters, filterOptions, brandOptions] = await Promise.all([
+    resolveStockLevelsFilters({
+      storeId,
+      q,
+      supplierId: rawSupplierId,
+      brandId: rawBrandId,
+      expiry: expiryRaw,
+      expiryOn: expiryOnRaw,
+      lowStock: lowStockOnly,
+    }),
+    getInventoryFilterOptions({
+      storeId,
+      q,
+      supplierId: rawSupplierId,
+      brandId: rawBrandId,
+      expiry: expiryRaw,
+      expiryOn: expiryOnRaw,
+      lowStock: lowStockOnly,
+    }),
+    getBrandOptions(),
+  ]);
 
   const { preset: expiryPreset, expiryOnYmd: expiryOnFilter } = resolveExpiryFilter(
     resolvedFilters.expiry,
@@ -208,31 +223,32 @@ export default async function InventoryStockPage({
     lowStock: resolvedFilters.lowStock,
   };
 
-  const filterOptions = await getInventoryFilterOptions({
-    storeId,
-    q: filters.q,
-    supplierId: filters.supplierId,
-    brandId: filters.brandId,
-    expiry: expiryRaw,
-    expiryOn: expiryOnRaw,
-    lowStock: lowStockOnly,
-  });
-
-  const brandOptions = await getBrandOptions();
-
-  const stockProductTotal = await countStockLevels(storeId, resolvedFilters);
+  const skipGuess = (rawSpage - 1) * stockPageSize;
+  const [stockProductTotal, stockGuess] = await Promise.all([
+    countStockLevels(storeId, resolvedFilters),
+    queryStockLevels({
+      storeId,
+      filters: resolvedFilters,
+      sort,
+      dir,
+      limit: stockPageSize,
+      offset: skipGuess,
+    }),
+  ]);
   const totalStockPages = Math.max(1, Math.ceil(stockProductTotal / stockPageSize));
   const spage = Math.min(rawSpage, totalStockPages);
   const stockSkip = (spage - 1) * stockPageSize;
-
-  const stock = await queryStockLevels({
-    storeId,
-    filters: resolvedFilters,
-    sort,
-    dir,
-    limit: stockPageSize,
-    offset: stockSkip,
-  });
+  const stock =
+    stockSkip === skipGuess
+      ? stockGuess
+      : await queryStockLevels({
+          storeId,
+          filters: resolvedFilters,
+          sort,
+          dir,
+          limit: stockPageSize,
+          offset: stockSkip,
+        });
 
   const toBatches = new URLSearchParams();
   if (filters.q.trim()) toBatches.set("q", filters.q.trim());

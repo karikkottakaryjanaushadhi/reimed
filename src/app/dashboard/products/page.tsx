@@ -93,21 +93,29 @@ export default async function ProductsPage({
   const storeId = ctx.activeStoreId;
   const listParams = { storeId, q, brand, supplier, category, type, schedule, gst, stock, sort, dir };
 
-  const [filterOptions, catalogBrands, totalCount] = await Promise.all([
+  const skipGuess = (rawPage - 1) * pageSizeRequested;
+  const [filterOptions, catalogBrands, totalCount, productsGuess] = await Promise.all([
     getProductFilterOptions({ storeId, q, brand, supplier, category, type, schedule, gst, stock }),
     getBrandOptions(),
     countProductList(listParams),
+    queryProductList({
+      ...listParams,
+      limit: pageSizeRequested,
+      offset: skipGuess,
+    }),
   ]);
   const pageSize = effectiveListPageSize(pageSizeRequested, totalCount);
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const page = Math.min(rawPage, totalPages);
   const skip = (page - 1) * pageSize;
-
-  const products = await queryProductList({
-    ...listParams,
-    limit: pageSize,
-    offset: skip,
-  });
+  const products =
+    skip === skipGuess && pageSize === pageSizeRequested
+      ? productsGuess
+      : await queryProductList({
+          ...listParams,
+          limit: pageSize,
+          offset: skip,
+        });
 
   const extras = productListExtras(q, brand, supplier, category, type, schedule, gst, stock, pageSize, sort, dir);
   const exportHref = buildSimpleListUrl("/api/dashboard/products/export", 1, DEFAULT_LIST_PAGE_SIZE, {

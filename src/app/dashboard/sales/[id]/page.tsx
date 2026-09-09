@@ -22,35 +22,29 @@ export default async function SaleBillViewPage({ params }: { params: Promise<{ i
   if (!ctx) redirect("/login");
 
   const { id } = await params;
-  const sale = await prisma.sale.findFirst({
-    where: { id, storeId: ctx.activeStoreId },
-    include: {
-      store: true,
-      createdBy: { select: { name: true } },
-      lines: {
-        orderBy: { id: "asc" },
-        include: {
-          product: { select: { name: true, sku: true, unit: true, packSize: true } },
-          lot: { select: { batchNo: true, expiryDate: true, costPrice: true } },
+  const storeId = ctx.activeStoreId;
+  const [sale, returnedAgg, returnRows, returnTotalsAgg] = await Promise.all([
+    prisma.sale.findFirst({
+      where: { id, storeId },
+      include: {
+        store: true,
+        createdBy: { select: { name: true } },
+        lines: {
+          orderBy: { id: "asc" },
+          include: {
+            product: { select: { name: true, sku: true, unit: true, packSize: true } },
+            lot: { select: { batchNo: true, expiryDate: true, costPrice: true } },
+          },
         },
       },
-    },
-  });
-  if (!sale) notFound();
-
-  const returnedAgg = await prisma.saleReturnLine.groupBy({
-    by: ["saleLineId"],
-    where: { saleReturn: { saleId: id, storeId: ctx.activeStoreId } },
-    _sum: { qty: true },
-  });
-  const returnedByLine = new Map<string, number>();
-  for (const row of returnedAgg) {
-    returnedByLine.set(row.saleLineId, row._sum.qty ?? 0);
-  }
-
-  const [returnRows, returnTotalsAgg, returnCountAll] = await Promise.all([
+    }),
+    prisma.saleReturnLine.groupBy({
+      by: ["saleLineId"],
+      where: { saleReturn: { saleId: id, storeId } },
+      _sum: { qty: true },
+    }),
     prisma.saleReturn.findMany({
-      where: { saleId: id, storeId: ctx.activeStoreId },
+      where: { saleId: id, storeId },
       orderBy: { createdAt: "desc" },
       take: 20,
       select: {
@@ -62,15 +56,20 @@ export default async function SaleBillViewPage({ params }: { params: Promise<{ i
       },
     }),
     prisma.saleReturn.aggregate({
-      where: { saleId: id, storeId: ctx.activeStoreId },
+      where: { saleId: id, storeId },
       _sum: { total: true },
-    }),
-    prisma.saleReturn.count({
-      where: { saleId: id, storeId: ctx.activeStoreId },
+      _count: true,
     }),
   ]);
+  if (!sale) notFound();
+
+  const returnedByLine = new Map<string, number>();
+  for (const row of returnedAgg) {
+    returnedByLine.set(row.saleLineId, row._sum.qty ?? 0);
+  }
 
   const returnCreditSum = Number(returnTotalsAgg._sum.total ?? 0);
+  const returnCountAll = returnTotalsAgg._count;
   const billGross = Number(sale.total);
   const billPayable = salePayableFromLineAmounts(
     sale.lines.map((l) => ({ amount: Number(l.amount), discountAmount: Number(l.discountAmount) })),

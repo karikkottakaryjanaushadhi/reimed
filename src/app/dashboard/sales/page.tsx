@@ -117,31 +117,43 @@ export default async function SalesPage({
     unpaid: unpaidOnly,
   };
 
-  const filterOptions = await getSalesFilterOptions(filterParams);
   const where = buildSalesFilterWhere(filterParams);
+  const skipGuess = (rawPage - 1) * pageSize;
 
-  const [totalCount, salesAgg, returnsAgg] = await Promise.all([
+  const [filterOptions, totalCount, salesAgg, returnsAgg, salesGuess] = await Promise.all([
+    getSalesFilterOptions(filterParams),
     prisma.sale.count({ where }),
     prisma.sale.aggregate({ where, _sum: { total: true, tax: true, discount: true, subtotal: true } }),
     prisma.saleReturn.aggregate({
       where: { storeId: ctx.activeStoreId, sale: where },
       _sum: { total: true },
     }),
+    prisma.sale.findMany({
+      where,
+      orderBy: salesOrderBy(sort, dir),
+      skip: skipGuess,
+      take: pageSize,
+      include: {
+        createdBy: { select: { name: true } },
+      },
+    }),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const page = Math.min(rawPage, totalPages);
   const skip = (page - 1) * pageSize;
-
-  const sales = await prisma.sale.findMany({
-    where,
-    orderBy: salesOrderBy(sort, dir),
-    skip,
-    take: pageSize,
-    include: {
-      createdBy: { select: { name: true } },
-    },
-  });
+  const sales =
+    skip === skipGuess
+      ? salesGuess
+      : await prisma.sale.findMany({
+          where,
+          orderBy: salesOrderBy(sort, dir),
+          skip,
+          take: pageSize,
+          include: {
+            createdBy: { select: { name: true } },
+          },
+        });
 
   const returnCreditsBySale = await returnCreditsBySaleIds(
     ctx.activeStoreId,

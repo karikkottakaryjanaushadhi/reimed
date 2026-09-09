@@ -1,5 +1,5 @@
-import type { Prisma } from "@prisma/client";
-import { createdAtDayRange } from "@/lib/date-range-filter";
+import { Prisma } from "@prisma/client";
+import { createdAtDayRange, sqlDateTimeRangeParts, sqlIlikePattern } from "@/lib/date-range-filter";
 import { prisma } from "@/lib/prisma";
 import { withServerTimedCache } from "@/lib/server-timed-cache";
 
@@ -58,6 +58,35 @@ export function buildPurchaseFilterWhere(
   return where;
 }
 
+function purchaseFilterAndSql(params: PurchaseFilterParams, exclude?: PurchaseFilterExclude) {
+  const dateFilter = createdAtDayRange(params.from || undefined, params.to || undefined);
+  const dateOn = params.dateOn ?? "recorded";
+  const dateCol = dateOn === "invoice" ? Prisma.sql`pu."invoiceDate"` : Prisma.sql`pu."createdAt"`;
+  const parts: Prisma.Sql[] = [
+    Prisma.sql`pu."storeId" = ${params.storeId}`,
+    ...sqlDateTimeRangeParts(dateCol, dateFilter),
+  ];
+  if (exclude !== "supplier" && params.supplier?.trim()) {
+    parts.push(Prisma.sql`s."name" ILIKE ${sqlIlikePattern(params.supplier)}`);
+  }
+  if (params.invoice?.trim()) {
+    parts.push(Prisma.sql`pu."invoiceRef" ILIKE ${sqlIlikePattern(params.invoice)}`);
+  }
+  if (exclude !== "product" && params.product?.trim()) {
+    parts.push(Prisma.sql`EXISTS (
+      SELECT 1
+      FROM "PurchaseLine" pl
+      INNER JOIN "Product" p ON p."id" = pl."productId"
+      WHERE pl."purchaseId" = pu."id" AND p."name" ILIKE ${sqlIlikePattern(params.product)}
+    )`);
+  }
+  if (params.status === "complete") parts.push(Prisma.sql`pu."complete" = TRUE`);
+  else if (params.status === "in_progress") parts.push(Prisma.sql`pu."complete" = FALSE`);
+  if (params.paid === "unpaid") parts.push(Prisma.sql`pu."paid" = FALSE`);
+  else if (params.paid === "paid") parts.push(Prisma.sql`pu."paid" = TRUE`);
+  return Prisma.join(parts, " AND ");
+}
+
 export async function getPurchaseFilterOptions(params: PurchaseFilterParams) {
   return withServerTimedCache(
     "purchase-filter-options",
@@ -74,27 +103,31 @@ export async function getPurchaseFilterOptions(params: PurchaseFilterParams) {
     },
     20_000,
     async () => {
-      const supplierWhere = buildPurchaseFilterWhere(params, "supplier");
-      const productWhere = buildPurchaseFilterWhere(params, "product");
+      const supplierWhere = purchaseFilterAndSql(params, "supplier");
+      const productWhere = purchaseFilterAndSql(params, "product");
 
       const [supplierRows, productRows] = await Promise.all([
-        prisma.purchase.findMany({
-          where: supplierWhere,
-          distinct: ["supplierId"],
-          select: { supplier: { select: { name: true } } },
-          orderBy: { supplier: { name: "asc" } },
-        }),
-        prisma.purchaseLine.findMany({
-          where: { purchase: productWhere },
-          distinct: ["productId"],
-          select: { product: { select: { name: true } } },
-          orderBy: { product: { name: "asc" } },
-        }),
+        prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
+          SELECT DISTINCT s."name" AS "name"
+          FROM "Purchase" pu
+          INNER JOIN "Supplier" s ON s."id" = pu."supplierId"
+          WHERE ${supplierWhere}
+          ORDER BY s."name" ASC
+        `),
+        prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
+          SELECT DISTINCT p."name" AS "name"
+          FROM "PurchaseLine" pl
+          INNER JOIN "Product" p ON p."id" = pl."productId"
+          INNER JOIN "Purchase" pu ON pu."id" = pl."purchaseId"
+          INNER JOIN "Supplier" s ON s."id" = pu."supplierId"
+          WHERE ${productWhere}
+          ORDER BY p."name" ASC
+        `),
       ]);
 
       return {
-        suppliers: supplierRows.map((r) => r.supplier.name),
-        products: productRows.map((r) => r.product.name),
+        suppliers: supplierRows.map((r) => r.name),
+        products: productRows.map((r) => r.name),
       };
     },
   );

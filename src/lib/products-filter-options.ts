@@ -88,16 +88,22 @@ export function productCatalogWhereParts(
   return whereParts;
 }
 
-function productStockHavingSql(stock: ProductStockFilter, storeId: string) {
-  const stockExpr = Prisma.sql`COALESCE(SUM(il."quantity") FILTER (WHERE il."storeId" = ${storeId}), 0)`;
+/** Lots for the active store only — avoids joining every branch then FILTER-ing. */
+export function productCatalogLotJoin(storeId: string) {
+  return Prisma.sql`LEFT JOIN "InventoryLot" il ON il."productId" = p."id" AND il."storeId" = ${storeId}`;
+}
+
+export const productCatalogStockExpr = Prisma.sql`COALESCE(SUM(il."quantity"), 0)`;
+
+function productStockHavingSql(stock: ProductStockFilter) {
   if (stock === "low") {
-    return Prisma.sql`HAVING ${stockExpr} <= p."reorderMin" AND p."reorderMin" > 0`;
+    return Prisma.sql`HAVING ${productCatalogStockExpr} <= p."reorderMin" AND p."reorderMin" > 0`;
   }
   if (stock === "out") {
-    return Prisma.sql`HAVING ${stockExpr} = 0`;
+    return Prisma.sql`HAVING ${productCatalogStockExpr} = 0`;
   }
   if (stock === "in") {
-    return Prisma.sql`HAVING ${stockExpr} > 0`;
+    return Prisma.sql`HAVING ${productCatalogStockExpr} > 0`;
   }
   return Prisma.empty;
 }
@@ -122,37 +128,59 @@ export async function getProductFilterOptions(
   return withServerTimedCache("product-filter-options", filterCacheKey(params), 20_000, async () => {
     const stock = params.stock ?? "";
     const storeId = params.storeId;
-    const havingSql = productStockHavingSql(stock, storeId);
+    const havingSql = productStockHavingSql(stock);
+    const supplierActive = !!(params.supplier?.trim());
+    const brandNeedsLots = !!stock || supplierActive;
     const brandWhere = Prisma.join(productCatalogWhereParts(params, "brand"), " AND ");
     const supplierWhere = Prisma.join(productCatalogWhereParts(params, "supplier"), " AND ");
+    const lotJoin = productCatalogLotJoin(storeId);
+    const supplierJoin = Prisma.sql`LEFT JOIN "Supplier" s ON s."id" = il."supplierId"`;
 
-    const [brandRows, supplierRows] = await Promise.all([
-      prisma.$queryRaw<Array<{ name: string }>>(
-        Prisma.sql`
+    const brandSql = brandNeedsLots
+      ? Prisma.sql`
           SELECT DISTINCT b."name" AS "name"
           FROM "Product" p
           INNER JOIN "Brand" b ON b."id" = p."brandId"
-          LEFT JOIN "InventoryLot" il ON il."productId" = p."id"
-          LEFT JOIN "Supplier" s ON s."id" = il."supplierId"
+          ${lotJoin}
+          ${supplierJoin}
           WHERE ${brandWhere}
           GROUP BY p."id", p."reorderMin", b."name"
           ${havingSql}
           ORDER BY b."name" ASC
-        `,
-      ),
-      prisma.$queryRaw<Array<{ name: string }>>(
-        Prisma.sql`
+        `
+      : Prisma.sql`
+          SELECT DISTINCT b."name" AS "name"
+          FROM "Product" p
+          INNER JOIN "Brand" b ON b."id" = p."brandId"
+          WHERE ${brandWhere}
+          ORDER BY b."name" ASC
+        `;
+
+    const supplierSql = stock
+      ? Prisma.sql`
           SELECT DISTINCT s."name" AS "name"
           FROM "Product" p
           LEFT JOIN "Brand" b ON b."id" = p."brandId"
-          INNER JOIN "InventoryLot" il ON il."productId" = p."id"
+          INNER JOIN "InventoryLot" il ON il."productId" = p."id" AND il."storeId" = ${storeId}
           INNER JOIN "Supplier" s ON s."id" = il."supplierId"
           WHERE ${supplierWhere}
           GROUP BY p."id", p."reorderMin", s."name"
           ${havingSql}
           ORDER BY s."name" ASC
-        `,
-      ),
+        `
+      : Prisma.sql`
+          SELECT DISTINCT s."name" AS "name"
+          FROM "Product" p
+          LEFT JOIN "Brand" b ON b."id" = p."brandId"
+          INNER JOIN "InventoryLot" il ON il."productId" = p."id" AND il."storeId" = ${storeId}
+          INNER JOIN "Supplier" s ON s."id" = il."supplierId"
+          WHERE ${supplierWhere}
+          ORDER BY s."name" ASC
+        `;
+
+    const [brandRows, supplierRows] = await Promise.all([
+      prisma.$queryRaw<Array<{ name: string }>>(brandSql),
+      prisma.$queryRaw<Array<{ name: string }>>(supplierSql),
     ]);
 
     return {

@@ -202,19 +202,16 @@ export default async function PurchasesPage({
     paid,
   };
 
-  const filterOptions = await getPurchaseFilterOptions(filterParams);
   const where = buildPurchaseFilterWhere(filterParams);
+  const skipGuess = (rawPage - 1) * pageSize;
 
-  const totalCount = await prisma.purchase.count({ where });
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  const page = Math.min(rawPage, totalPages);
-  const skip = (page - 1) * pageSize;
-
-  const [purchases, extraSummaryPurchases] = await Promise.all([
+  const [filterOptions, totalCount, purchasesGuess] = await Promise.all([
+    getPurchaseFilterOptions(filterParams),
+    prisma.purchase.count({ where }),
     prisma.purchase.findMany({
       where,
       orderBy: purchaseOrderBy(sort, dir),
-      skip,
+      skip: skipGuess,
       take: pageSize,
       select: {
         id: true,
@@ -231,13 +228,53 @@ export default async function PurchasesPage({
         lines: { select: purchaseBillLineSelect },
       },
     }),
-    totalCount > pageSize
-      ? prisma.purchase.findMany({
-          where,
-          select: { lines: { select: purchaseBillLineSelect } },
-        })
-      : Promise.resolve(null),
   ]);
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const page = Math.min(rawPage, totalPages);
+  const skip = (page - 1) * pageSize;
+  const purchases =
+    skip === skipGuess
+      ? purchasesGuess
+      : await prisma.purchase.findMany({
+          where,
+          orderBy: purchaseOrderBy(sort, dir),
+          skip,
+          take: pageSize,
+          select: {
+            id: true,
+            purchaseNo: true,
+            createdAt: true,
+            invoiceRef: true,
+            invoiceDate: true,
+            complete: true,
+            paid: true,
+            paymentMode: true,
+            paidAt: true,
+            paymentRefLast4: true,
+            supplier: { select: { name: true } },
+            lines: { select: purchaseBillLineSelect },
+          },
+        });
+
+  const extraSummaryLines =
+    totalCount > pageSize
+      ? await prisma.purchaseLine.findMany({
+          where: { purchase: where },
+          select: { purchaseId: true, ...purchaseBillLineSelect },
+        })
+      : null;
+
+  const extraSummaryPurchases = extraSummaryLines
+    ? (() => {
+        const byPurchase = new Map<string, typeof extraSummaryLines>();
+        for (const line of extraSummaryLines) {
+          const rows = byPurchase.get(line.purchaseId);
+          if (rows) rows.push(line);
+          else byPurchase.set(line.purchaseId, [line]);
+        }
+        return [...byPurchase.values()].map((lines) => ({ lines }));
+      })()
+    : null;
 
   const summary = summarizePurchaseBills(extraSummaryPurchases ?? purchases);
 
