@@ -313,14 +313,14 @@ export function AppNav({
           </button>
           <Link
             href="/dashboard"
-            className="flex shrink-0 items-center rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue"
+            className="flex shrink-0 items-center overflow-hidden rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue"
           >
             <Image
               src="/reimed-logo-header.png"
               alt="REIMED Pharmacy POS"
               width={470}
               height={156}
-              className="h-10 w-auto drop-shadow-[0_2px_12px_rgba(0,120,215,0.45)] sm:h-16"
+              className="h-10 w-auto rounded-lg bg-white p-1 drop-shadow-[0_2px_12px_rgba(0,120,215,0.45)] sm:h-16"
               priority
               unoptimized
             />
