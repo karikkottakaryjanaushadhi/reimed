@@ -50,7 +50,7 @@ export function StockListMobile({
                 <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Product</p>
                 <StockProductNameField productId={s.productId} name={s.name} canEdit={canEditBrand} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
                 <div>
                   <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Brand</p>
                   <StockBrandSelect
@@ -82,25 +82,25 @@ export function StockListMobile({
                   <StockGstSelect productId={s.productId} gstPct={s.gstPct} canEdit={canEditBrand} />
                 </div>
               </div>
-              <dl className="grid grid-cols-2 gap-2 text-sm">
-                <div>
+              <dl className="grid grid-cols-2 gap-3 [&>*]:min-w-0 text-sm">
+                <div className="col-span-2 min-w-0">
                   <dt className="text-xs text-zinc-500">Supplier</dt>
                   <dd className="truncate text-zinc-700 dark:text-zinc-300">{s.supplier ?? "—"}</dd>
                 </div>
-                <div>
-                  <dt className="text-xs text-zinc-500">Reorder min</dt>
-                  <dd className="tabular-nums text-zinc-600">{s.reorderMin}</dd>
-                </div>
-                <div className="col-span-2">
+                <div className="min-w-0">
                   <dt className="text-xs text-zinc-500">Qty on hand</dt>
                   <dd
                     className={
-                      "text-2xl font-semibold tabular-nums " +
+                      "text-lg font-semibold tabular-nums " +
                       (low ? "text-amber-700 dark:text-amber-400" : "text-zinc-900 dark:text-zinc-50")
                     }
                   >
                     {s.qty}
                   </dd>
+                </div>
+                <div className="min-w-0">
+                  <dt className="text-xs text-zinc-500">Reorder min</dt>
+                  <dd className="tabular-nums text-zinc-600">{s.reorderMin}</dd>
                 </div>
               </dl>
             </div>

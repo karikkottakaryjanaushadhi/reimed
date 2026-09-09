@@ -39,6 +39,7 @@ import {
   syncMrpDiscountFields,
 } from "./pos-line-helpers";
 import { LINE_TABLE_SLNO_COL, POS_FIELD_INPUT_CLASS, POS_PRIMARY_CTA_CLASS } from "./pos-billing-ui";
+import { PosProductInquiryModal } from "./pos-product-inquiry-modal";
 
 type StockRow = {
   productId: string;
@@ -99,6 +100,8 @@ export function useDraftLine({
   const [stockHi, setStockHi] = useState(0);
   /** Mobile: show full batch list only while choosing; collapse after pick. */
   const [batchPickerOpen, setBatchPickerOpen] = useState(false);
+  const [inquiryOpen, setInquiryOpen] = useState(false);
+  const [inquiryProductId, setInquiryProductId] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     pickViewportRef(searchInputMobileRef, searchInputDesktopRef).current?.focus();
@@ -225,7 +228,7 @@ export function useDraftLine({
     scrollChildIntoViewContainer(batchListRef.current, el);
   }, [lotId, lots]);
 
-  async function pickProduct(pid: string) {
+  async function pickProduct(pid: string, opts?: { preferredLotId?: string }) {
     setProductId(pid);
     setLotId("");
     const res = await fetch(`/api/inventory/lots?productId=${pid}&inStockOnly=1`);
@@ -235,8 +238,16 @@ export function useDraftLine({
       setLots(list);
       const withStock = list.filter((l) => availableLotQty(l.quantity, cart, l.id) > 0);
       const pickable = withStock.filter((l) => !l.expired);
-      setBatchPickerOpen(withStock.length > 1 || (withStock.length === 1 && Boolean(withStock[0]?.expired)));
-      const first = pickable[0];
+      const preferred = opts?.preferredLotId
+        ? pickable.find((l) => l.id === opts.preferredLotId)
+        : undefined;
+      const first = preferred ?? pickable[0];
+      const skipBatchPicker = Boolean(preferred);
+      setBatchPickerOpen(
+        skipBatchPicker
+          ? false
+          : withStock.length > 1 || (withStock.length === 1 && Boolean(withStock[0]?.expired)),
+      );
       if (first) {
         const avail = availableLotQty(first.quantity, cart, first.id);
         setLotId(first.id);
@@ -244,10 +255,10 @@ export function useDraftLine({
         setRate(defaultRateForLot(first));
         setDiscountFromLotOnly(true);
         setDiscountPct(nominalDiscountPctFromLot(first));
-        if (pickable.length > 1) {
-          focusBatchAfterPickRef.current = true;
-        } else {
+        if (skipBatchPicker || pickable.length <= 1) {
           focusQtyAfterPickRef.current = true;
+        } else {
+          focusBatchAfterPickRef.current = true;
         }
       } else {
         setLotId("");
@@ -265,6 +276,65 @@ export function useDraftLine({
       }
     }
   }
+
+  const availableQtyForInquiry = useCallback(
+    (rowLotId: string, onHand: number) => availableLotQty(onHand, cart, rowLotId),
+    [cart],
+  );
+
+  function resolveInquiryProductId(): string | null {
+    if (productId) return productId;
+    if (filteredStock.length === 0) return null;
+    const i = stockHi >= 0 ? stockHi : 0;
+    return filteredStock[i]?.productId ?? null;
+  }
+
+  function closeProductInquiry() {
+    setInquiryOpen(false);
+    setInquiryProductId(null);
+    focusActiveSearch();
+  }
+
+  function openProductInquiry() {
+    const pid = resolveInquiryProductId();
+    if (!pid) return;
+    setInquiryProductId(pid);
+    setInquiryOpen(true);
+  }
+
+  function pickInquiryLot(lotRowId: string) {
+    const pid = inquiryProductId;
+    setInquiryOpen(false);
+    setInquiryProductId(null);
+    if (!pid) return;
+    void pickProduct(pid, { preferredLotId: lotRowId });
+  }
+
+  useEffect(() => {
+    function onKey(e: globalThis.KeyboardEvent) {
+      if (e.key !== "F3" || e.repeat) return;
+      if (inquiryOpen) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setInquiryOpen(false);
+        setInquiryProductId(null);
+        focusActiveSearch();
+        return;
+      }
+      const pid = productId
+        ? productId
+        : filteredStock.length > 0
+          ? (filteredStock[stockHi >= 0 ? stockHi : 0]?.productId ?? null)
+          : null;
+      if (!pid) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setInquiryProductId(pid);
+      setInquiryOpen(true);
+    }
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [inquiryOpen, productId, filteredStock, stockHi]);
 
   useEffect(() => {
     const lot = lots.find((l) => l.id === lotId);
@@ -610,6 +680,13 @@ export function useDraftLine({
     setDraftDiscountFromPct,
     setDraftDiscountFromAmount,
     focusQtySelectAll,
+    inquiryOpen,
+    inquiryProductId,
+    canOpenInquiry: Boolean(resolveInquiryProductId()),
+    openProductInquiry,
+    closeProductInquiry,
+    pickInquiryLot,
+    availableQtyForInquiry,
     clearProductSelection: () => {
       setProductId(null);
       setLots([]);
@@ -650,6 +727,7 @@ function DraftLineProductSearch({
   stockAnchorRef?: RefObject<HTMLDivElement | null>;
 }) {
   const showClear = draft.q.length > 0 || draft.lots.length > 0;
+  const inputPadClass = showClear ? " pr-[4.25rem]" : " pr-9";
   return (
     <div ref={stockAnchorRef} className="relative min-w-0">
       {hideLabel ? null : (
@@ -662,7 +740,8 @@ function DraftLineProductSearch({
         id={draft.searchFieldId}
         placeholder={placeholder}
         autoComplete="off"
-        className={`${inputClassName ?? ""}${showClear ? " pr-9" : ""}`.trim()}
+        title="F3 — product and batch details"
+        className={`${inputClassName ?? ""}${inputPadClass}`.trim()}
         value={draft.q}
         onChange={(e) => {
           draft.setQ(e.target.value);
@@ -670,21 +749,41 @@ function DraftLineProductSearch({
         }}
         onKeyDown={draft.onSearchKeyDown}
       />
-      {showClear ? (
+      <div className="absolute right-1 top-1/2 z-10 flex -translate-y-1/2 items-center">
         <button
           type="button"
           tabIndex={-1}
-          className="absolute right-1 top-1/2 z-10 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-          title="Clear search"
-          aria-label="Clear search"
+          disabled={!draft.canOpenInquiry}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 disabled:pointer-events-none disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+          title={draft.canOpenInquiry ? "Product and batch details (F3)" : "Search a product, then press F3"}
+          aria-label="Product and batch details"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => draft.clearSearch()}
+          onClick={() => draft.openProductInquiry()}
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4" aria-hidden="true">
-            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+            <path
+              fillRule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
+              clipRule="evenodd"
+            />
           </svg>
         </button>
-      ) : null}
+        {showClear ? (
+          <button
+            type="button"
+            tabIndex={-1}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+            title="Clear search"
+            aria-label="Clear search"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => draft.clearSearch()}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4" aria-hidden="true">
+              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+            </svg>
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -1230,5 +1329,17 @@ export function DraftLineController({
   children: (draft: DraftLineState) => ReactNode;
 }) {
   const draft = useDraftLine({ cart, onCommit, tableScrollRef, focusCustomerName });
-  return <>{children(draft)}</>;
+  return (
+    <>
+      {children(draft)}
+      <PosProductInquiryModal
+        open={draft.inquiryOpen}
+        productId={draft.inquiryProductId}
+        selectedLotId={draft.lotId}
+        availableQty={draft.availableQtyForInquiry}
+        onClose={draft.closeProductInquiry}
+        onPickLot={draft.pickInquiryLot}
+      />
+    </>
+  );
 }

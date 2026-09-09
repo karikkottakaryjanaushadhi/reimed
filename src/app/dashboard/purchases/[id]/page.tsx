@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { format } from "date-fns";
 import { formatAppDateTime } from "@/lib/app-timezone";
+import { ListItemNames } from "@/components/list-item-names";
 import { getAuthContext, isManager } from "@/lib/auth-context";
 import { prisma } from "@/lib/prisma";
 import { purchaseBillTotalsFromLines } from "@/lib/purchase-line";
@@ -51,7 +52,9 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
       orderBy: { createdAt: "desc" },
       include: {
         createdBy: { select: { name: true } },
-        _count: { select: { lines: true } },
+        lines: {
+          select: { purchaseLine: { select: { product: { select: { id: true, name: true } } } } },
+        },
       },
     }),
     prisma.purchaseReturn.aggregate({
@@ -255,8 +258,8 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
                     </>
                   ) : null}
                   <span className="mx-2 text-zinc-300">·</span>
-                  <span className="tabular-nums text-zinc-500">
-                    {r._count.lines} line{r._count.lines === 1 ? "" : "s"}
+                  <span className="text-zinc-500">
+                    <ListItemNames products={r.lines.map((l) => l.purchaseLine.product)} />
                   </span>
                   {r.note?.trim() ? (
                     <p className="mt-1 text-xs text-zinc-500">{r.note.trim()}</p>

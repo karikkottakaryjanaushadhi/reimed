@@ -641,7 +641,7 @@ function BatchRowCells({
               onChange={(e) => setProductName(e.target.value)}
             />
           </label>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [&>*]:min-w-0">
             <label className="block text-xs text-zinc-500">
               Brand
               <div className="mt-1">
@@ -675,7 +675,7 @@ function BatchRowCells({
               />
             </label>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
             <label className="block text-xs text-zinc-500">
               Batch
               <input className={`${cellIn} mt-1 w-full font-mono text-base`} value={batchNo} disabled={busy} onChange={(e) => setBatchNo(e.target.value)} />
@@ -685,7 +685,7 @@ function BatchRowCells({
               <ExpiryDateInput className={`${cellIn} mt-1 text-base`} wrapperClassName="mt-1 w-full" value={expiryYmd} disabled={busy} onChange={(e) => setExpiryYmd(e.target.value)} />
             </label>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 [&>*]:min-w-0">
             <label className="block text-xs text-zinc-500">
               Qty
               <input type="number" min={0} className={`${cellIn} mt-1 w-full text-base`} value={qty} disabled={busy} onChange={(e) => { setQty(e.target.value); setErr(null); }} />
@@ -703,7 +703,7 @@ function BatchRowCells({
               <input type="number" min={0} step={0.01} className={`${cellIn} mt-1 w-full text-base`} value={rateStr} disabled={busy} onChange={(e) => { const v = e.target.value; setRateStr(v); applyDiscountFromMrpAndRate(mrp, v); }} />
             </label>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3 [&>*]:min-w-0">
             <label className="block text-xs text-zinc-500">
               S.Disc %
               <input type="number" min={0} max={100} step={0.01} className={`${cellIn} mt-1 w-full text-base`} value={salePct} disabled={busy} onChange={(e) => { const v = e.target.value; setSalePct(v); const m = Number.parseFloat(mrp); const pct = Number.parseFloat(v); if (!Number.isFinite(m) || m <= 0 || !Number.isFinite(pct)) return; const newR = saleRateFromMrpDiscountPct(m, pct); setRateStr(String(newR)); setSaleRs(String(round2(m - newR))); }} />
@@ -720,12 +720,17 @@ function BatchRowCells({
                 onChange={setReorderMin}
               />
             </label>
-            <label className="block text-xs text-zinc-500">
+            <div className="block text-xs text-zinc-500">
               Mrg%
-              <div className="mt-1 rounded border border-transparent py-2 text-right text-base tabular-nums text-zinc-800 dark:text-zinc-200">
-                {marginPctLive != null ? `${marginPctLive.toFixed(1)}%` : "—"}
-              </div>
-            </label>
+              <input
+                readOnly
+                tabIndex={-1}
+                aria-readonly="true"
+                title="Margin % (calculated, not editable)"
+                className={`${cellIn} mt-1 w-full cursor-default bg-zinc-50 text-base text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300`}
+                value={marginPctLive != null ? `${marginPctLive.toFixed(1)}%` : "—"}
+              />
+            </div>
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">

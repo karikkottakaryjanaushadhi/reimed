@@ -4,6 +4,7 @@ import { formatAppDateTime, formatAppMonthEndYmd, formatAppMonthStartYmd } from 
 import { ListPageSizeControls, ListPaginationNav } from "@/components/list-pagination";
 import { MobileFilterSheet } from "@/components/mobile-filter-sheet";
 import { TransfersFilterForm } from "@/app/dashboard/transfers/transfers-filter-form";
+import { ListItemNames } from "@/components/list-item-names";
 import { getAuthContext, isManager } from "@/lib/auth-context";
 import { trimDateParam } from "@/lib/date-range-filter";
 import {
@@ -17,30 +18,6 @@ import {
   getTransferFilterOptions,
   parseTransferDirection,
 } from "@/lib/transfers-filter-options";
-
-const ITEM_NAME_PREVIEW = 3;
-
-function uniqueProductNames(lines: { product: { id: string; name: string } }[]) {
-  const names = [...new Map(lines.map((l) => [l.product.id, l.product.name])).values()].sort((a, b) =>
-    a.localeCompare(b),
-  );
-  return {
-    names,
-    shown: names.slice(0, ITEM_NAME_PREVIEW),
-    extra: Math.max(0, names.length - ITEM_NAME_PREVIEW),
-  };
-}
-
-function TransferItemNames({ lines }: { lines: { product: { id: string; name: string } }[] }) {
-  const { names, shown, extra } = uniqueProductNames(lines);
-  if (names.length === 0) return <span className="text-zinc-400">—</span>;
-  return (
-    <span className="line-clamp-2" title={names.join(", ")}>
-      {shown.join(", ")}
-      {extra > 0 ? <span className="text-zinc-500"> +{extra} more</span> : null}
-    </span>
-  );
-}
 
 function transferListExtras(
   from: string,
@@ -256,7 +233,7 @@ export default async function TransfersPage({
                   </td>
                   <td className="px-4 py-3">{isOut ? t.toStore.name : t.fromStore.name}</td>
                   <td className="max-w-xs px-4 py-3">
-                    <TransferItemNames lines={t.lines} />
+                    <ListItemNames products={t.lines.map((l) => l.product)} />
                   </td>
                   <td className="px-4 py-3">{t.createdBy.name}</td>
                 </tr>
@@ -287,7 +264,7 @@ export default async function TransfersPage({
                   {isOut ? "Sent out" : "Received"} · {t.createdBy.name}
                 </p>
                 <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-                  <TransferItemNames lines={t.lines} />
+                  <ListItemNames products={t.lines.map((l) => l.product)} />
                 </p>
               </Link>
             </li>

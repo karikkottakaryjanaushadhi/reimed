@@ -72,7 +72,7 @@ export function StockCategorySelect({
         className={
           compact
             ? "block max-w-[5.5rem] truncate text-[11px] text-zinc-600 dark:text-zinc-400"
-            : "whitespace-nowrap text-xs text-zinc-600 dark:text-zinc-400"
+            : "block min-w-0 truncate text-xs text-zinc-600 dark:text-zinc-400"
         }
         title={PRODUCT_CATEGORY_LABELS[normalized]}
       >
@@ -82,7 +82,7 @@ export function StockCategorySelect({
   }
 
   return (
-    <div className={compact ? "flex min-w-0 max-w-[5.75rem] flex-col gap-0.5" : "flex min-w-[7.5rem] flex-col gap-0.5"}>
+    <div className={compact ? "flex min-w-0 max-w-[5.75rem] flex-col gap-0.5" : "flex w-full min-w-0 flex-col gap-0.5"}>
       <select
         value={value}
         onChange={(e) => void onChange(e)}
@@ -91,7 +91,7 @@ export function StockCategorySelect({
         className={
           compact
             ? "w-full max-w-full rounded border border-zinc-300 bg-white px-1 py-1 text-[11px] text-zinc-900 shadow-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
-            : "w-full min-w-[7.5rem] rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-900 shadow-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+            : "w-full min-w-0 max-w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-900 shadow-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
         }
       >
         {PRODUCT_CATEGORIES.map((c) => (

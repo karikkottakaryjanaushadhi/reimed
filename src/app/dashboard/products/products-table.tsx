@@ -61,8 +61,8 @@ export function ProductsTable({
             <col className="w-[4.5rem]" />
             <col className="w-[5.5rem]" />
             <col className="w-[4.75rem]" />
-            <col className="w-[11rem]" />
-            <col className="w-[3.25rem]" />
+            <col className="w-[9.25rem]" />
+            <col className="w-[5rem]" />
             <col className="w-[3rem]" />
             <col className="w-[3.5rem]" />
             <col className="w-[4.5rem]" />
@@ -205,7 +205,7 @@ function ProductCatalogRow({
       <td className="truncate px-2 py-1.5 text-zinc-600 dark:text-zinc-400" title={p.suppliers ?? undefined}>
         {p.suppliers ?? "—"}
       </td>
-      <td className={`px-2 py-1.5 text-right tabular-nums ${stockCellClass(p.stockQty, p.reorderMin)}`}>
+      <td className={`whitespace-nowrap px-2 py-1.5 text-right tabular-nums ${stockCellClass(p.stockQty, p.reorderMin)}`}>
         {p.stockQty}
       </td>
       <td className="px-2 py-1.5 align-top">

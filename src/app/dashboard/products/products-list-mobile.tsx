@@ -61,19 +61,12 @@ function ProductCatalogCard({
   }, [p.productCategory]);
 
   return (
-        <article
-          className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Name</p>
-              <StockProductNameField productId={p.productId} name={p.name} canEdit={isManager} />
-            </div>
-            <p className={`shrink-0 text-lg font-semibold tabular-nums ${stockCellClass(p.stockQty, p.reorderMin)}`}>
-              {p.stockQty}
-            </p>
+        <article className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="min-w-0">
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Name</p>
+            <StockProductNameField productId={p.productId} name={p.name} canEdit={isManager} />
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="mt-3 grid grid-cols-2 gap-3 [&>*]:min-w-0">
             <div>
               <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Brand</p>
               <StockBrandSelect
@@ -98,7 +91,7 @@ function ProductCatalogCard({
               />
             </div>
             <div>
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Drug code</p>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Code</p>
               <StockDrugCodeField
                 productId={p.productId}
                 sku={p.sku}
@@ -119,8 +112,14 @@ function ProductCatalogCard({
               />
             </div>
             <div>
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">GST %</p>
-              <StockGstSelect productId={p.productId} gstPct={p.gstPct} canEdit={isManager} />
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Supplier</p>
+              <p className="truncate text-sm text-zinc-600 dark:text-zinc-400">{p.suppliers ?? "—"}</p>
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Stock</p>
+              <p className={`px-2 py-1.5 text-sm font-semibold tabular-nums ${stockCellClass(p.stockQty, p.reorderMin)}`}>
+                {p.stockQty}
+              </p>
             </div>
             <div>
               <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Pack</p>
@@ -134,7 +133,11 @@ function ProductCatalogCard({
               />
             </div>
             <div>
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Reorder min</p>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">GST %</p>
+              <StockGstSelect productId={p.productId} gstPct={p.gstPct} canEdit={isManager} />
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Reorder</p>
               <StockIntField
                 productId={p.productId}
                 field="reorderMin"
@@ -145,12 +148,6 @@ function ProductCatalogCard({
               />
             </div>
           </div>
-          {p.suppliers ? (
-            <div className="mt-3">
-              <p className="text-xs text-zinc-500">Supplier</p>
-              <p className="truncate text-sm text-zinc-600 dark:text-zinc-400">{p.suppliers}</p>
-            </div>
-          ) : null}
         </article>
   );
 }

@@ -65,7 +65,7 @@ export function StockIntField({
   }
 
   return (
-    <div className="flex min-w-0 flex-col items-end gap-0.5">
+    <div className="flex min-w-0 flex-col gap-0.5">
       <input
         aria-label={ariaLabel}
         type="number"
@@ -74,7 +74,7 @@ export function StockIntField({
         className={
           compact
             ? "w-full min-w-0 rounded border border-zinc-300 bg-white px-1 py-1 text-right text-[11px] tabular-nums text-zinc-900 shadow-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
-            : "w-full max-w-[6rem] rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-right text-sm tabular-nums text-zinc-900 shadow-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+            : "w-full min-w-0 rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-right text-sm tabular-nums text-zinc-900 shadow-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
         }
         value={raw}
         disabled={pending}

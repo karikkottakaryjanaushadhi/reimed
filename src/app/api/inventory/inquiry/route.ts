@@ -1,0 +1,94 @@
+import { NextResponse } from "next/server";
+import { differenceInCalendarDays, startOfDay } from "date-fns";
+import { getAuthContext } from "@/lib/auth-context";
+import { lotPackSize } from "@/lib/inventory-lot-pack-size";
+import { isInventoryLotExpired } from "@/lib/inventory-lot-expiry";
+import { prisma } from "@/lib/prisma";
+import type { ProductInquiry } from "@/lib/inventory-product-inquiry";
+
+/** Product master + all batches at the active store (including zero qty / expired). */
+export async function GET(req: Request) {
+  const ctx = await getAuthContext();
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const productId = new URL(req.url).searchParams.get("productId")?.trim();
+  if (!productId) return NextResponse.json({ error: "productId required" }, { status: 400 });
+
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      genericName: true,
+      hsn: true,
+      gstPct: true,
+      packSize: true,
+      productCategory: true,
+      productType: true,
+      productSchedule: true,
+      reorderMin: true,
+      unit: true,
+      brand: { select: { name: true } },
+    },
+  });
+  if (!product) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const today = startOfDay(new Date());
+  const lots = await prisma.inventoryLot.findMany({
+    where: { storeId: ctx.activeStoreId, productId },
+    select: {
+      id: true,
+      batchNo: true,
+      expiryDate: true,
+      quantity: true,
+      costPrice: true,
+      mrp: true,
+      saleRate: true,
+      salesDiscountPct: true,
+      salesDiscountRs: true,
+      packSize: true,
+      product: { select: { packSize: true } },
+      supplier: { select: { name: true } },
+    },
+    orderBy: [{ expiryDate: "asc" }, { batchNo: "asc" }],
+  });
+
+  const body: ProductInquiry = {
+    product: {
+      id: product.id,
+      name: product.name,
+      sku: product.sku,
+      genericName: product.genericName,
+      brand: product.brand?.name ?? null,
+      hsn: product.hsn,
+      gstPct: Number(product.gstPct),
+      packSize: product.packSize,
+      productCategory: product.productCategory,
+      productType: product.productType,
+      productSchedule: product.productSchedule,
+      reorderMin: product.reorderMin,
+      unit: product.unit,
+    },
+    lots: lots.map((lot) => {
+      const daysToExpiry = differenceInCalendarDays(lot.expiryDate, today);
+      return {
+        id: lot.id,
+        batchNo: lot.batchNo,
+        expiryDate: lot.expiryDate.toISOString(),
+        quantity: lot.quantity,
+        costPrice: Number(lot.costPrice),
+        mrp: Number(lot.mrp),
+        saleRate: Number(lot.saleRate),
+        salesDiscountPct: Number(lot.salesDiscountPct),
+        salesDiscountRs: Number(lot.salesDiscountRs),
+        supplierName: lot.supplier?.name ?? null,
+        packSize: lotPackSize(lot),
+        daysToExpiry,
+        expired: isInventoryLotExpired(lot.expiryDate),
+      };
+    }),
+  };
+
+  return NextResponse.json(body);
+}

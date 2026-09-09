@@ -76,7 +76,7 @@ export function StockGstSelect({
         className={
           compact
             ? "inline-block min-w-0 max-w-[2.75rem] truncate text-center text-[11px] text-zinc-600 dark:text-zinc-400"
-            : "whitespace-nowrap text-xs text-zinc-600 dark:text-zinc-400"
+            : "block min-w-0 truncate text-xs text-zinc-600 dark:text-zinc-400"
         }
         title={`GST ${disp}%`}
       >
@@ -86,7 +86,7 @@ export function StockGstSelect({
   }
 
   return (
-    <div className={compact ? "flex min-w-0 max-w-[3.25rem] flex-col gap-0" : "flex min-w-[6rem] flex-col gap-0.5"}>
+    <div className={compact ? "flex min-w-0 max-w-[3.25rem] flex-col gap-0" : "flex w-full min-w-0 flex-col gap-0.5"}>
       {matched === null ? (
         <span
           className={
@@ -107,7 +107,7 @@ export function StockGstSelect({
         className={
           compact
             ? "w-full min-w-0 max-w-full rounded border border-zinc-300 bg-white px-0.5 py-1 text-center text-[11px] tabular-nums text-zinc-900 shadow-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
-            : "w-full min-w-[6rem] rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-900 shadow-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+            : "w-full min-w-0 max-w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-900 shadow-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
         }
       >
         {matched === null ? <option value="">Set slab…</option> : null}
