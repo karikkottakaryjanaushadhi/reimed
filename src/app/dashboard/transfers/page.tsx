@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { formatAppDateTime } from "@/lib/app-timezone";
+import { formatAppDateTime, formatAppMonthEndYmd, formatAppMonthStartYmd } from "@/lib/app-timezone";
 import { ListPageSizeControls, ListPaginationNav } from "@/components/list-pagination";
+import { MobileFilterSheet } from "@/components/mobile-filter-sheet";
+import { TransfersFilterForm } from "@/app/dashboard/transfers/transfers-filter-form";
 import { getAuthContext, isManager } from "@/lib/auth-context";
 import { trimDateParam } from "@/lib/date-range-filter";
 import {
@@ -10,11 +12,58 @@ import {
   parseListLimitParam,
 } from "@/lib/list-pagination";
 import { prisma } from "@/lib/prisma";
-import { createdAtDayRange } from "@/lib/date-range-filter";
+import {
+  buildTransferFilterWhere,
+  getTransferFilterOptions,
+  parseTransferDirection,
+} from "@/lib/transfers-filter-options";
 
-function parseDirection(raw: unknown): "in" | "out" | "all" {
-  if (raw === "in" || raw === "out") return raw;
-  return "all";
+const ITEM_NAME_PREVIEW = 3;
+
+function uniqueProductNames(lines: { product: { id: string; name: string } }[]) {
+  const names = [...new Map(lines.map((l) => [l.product.id, l.product.name])).values()].sort((a, b) =>
+    a.localeCompare(b),
+  );
+  return {
+    names,
+    shown: names.slice(0, ITEM_NAME_PREVIEW),
+    extra: Math.max(0, names.length - ITEM_NAME_PREVIEW),
+  };
+}
+
+function TransferItemNames({ lines }: { lines: { product: { id: string; name: string } }[] }) {
+  const { names, shown, extra } = uniqueProductNames(lines);
+  if (names.length === 0) return <span className="text-zinc-400">—</span>;
+  return (
+    <span className="line-clamp-2" title={names.join(", ")}>
+      {shown.join(", ")}
+      {extra > 0 ? <span className="text-zinc-500"> +{extra} more</span> : null}
+    </span>
+  );
+}
+
+function transferListExtras(
+  from: string,
+  to: string,
+  direction: ReturnType<typeof parseTransferDirection>,
+  counterpartyId: string,
+  product: string,
+  transferNo: string,
+  batch: string,
+  recordedBy: string,
+  pageSize: number,
+): Record<string, string> {
+  const e: Record<string, string> = {};
+  if (from) e.from = from;
+  if (to) e.to = to;
+  if (direction !== "all") e.direction = direction;
+  if (counterpartyId) e.branch = counterpartyId;
+  if (product) e.product = product;
+  if (transferNo) e.transferNo = transferNo;
+  if (batch) e.batch = batch;
+  if (recordedBy) e.recordedBy = recordedBy;
+  if (pageSize !== DEFAULT_LIST_PAGE_SIZE) e.limit = String(pageSize);
+  return e;
 }
 
 export default async function TransfersPage({
@@ -26,64 +75,105 @@ export default async function TransfersPage({
     from?: string;
     to?: string;
     direction?: string;
+    branch?: string;
+    product?: string;
+    transferNo?: string;
+    batch?: string;
+    recordedBy?: string;
   }>;
 }) {
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
 
   const sp = await searchParams;
-  const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
+  const rawPage = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
   const limit = parseListLimitParam(sp.limit);
   const from = trimDateParam(sp.from);
   const to = trimDateParam(sp.to);
-  const direction = parseDirection(sp.direction);
-  const dateFilter = createdAtDayRange(from, to);
-  const skip = (page - 1) * limit;
+  const direction = parseTransferDirection(sp.direction);
+  const counterpartyId = typeof sp.branch === "string" ? sp.branch.trim() : "";
+  const product = typeof sp.product === "string" ? sp.product.trim() : "";
+  const transferNo = typeof sp.transferNo === "string" ? sp.transferNo.trim() : "";
+  const batch = typeof sp.batch === "string" ? sp.batch.trim() : "";
+  const recordedBy = typeof sp.recordedBy === "string" ? sp.recordedBy.trim() : "";
 
   const storeId = ctx.activeStoreId;
-  const directionWhere =
-    direction === "in"
-      ? { toStoreId: storeId }
-      : direction === "out"
-        ? { fromStoreId: storeId }
-        : { OR: [{ fromStoreId: storeId }, { toStoreId: storeId }] };
-
-  const where = {
-    ...directionWhere,
-    ...(dateFilter ? { createdAt: dateFilter } : {}),
+  const filterParams = {
+    storeId,
+    from: from || undefined,
+    to: to || undefined,
+    direction,
+    counterpartyId: counterpartyId || undefined,
+    product: product || undefined,
+    transferNo: transferNo || undefined,
+    batch: batch || undefined,
+    recordedBy: recordedBy || undefined,
   };
 
-  const [transfers, total] = await Promise.all([
-    prisma.stockTransfer.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: limit,
-      include: {
-        fromStore: { select: { name: true } },
-        toStore: { select: { name: true } },
-        createdBy: { select: { name: true } },
-        _count: { select: { lines: true } },
-      },
-    }),
+  const where = buildTransferFilterWhere(filterParams);
+  const [filterOptions, total] = await Promise.all([
+    getTransferFilterOptions(filterParams),
     prisma.stockTransfer.count({ where }),
   ]);
-
   const totalPages = Math.max(1, Math.ceil(total / limit));
-  const listExtras: Record<string, string> = {};
-  if (from) listExtras.from = from;
-  if (to) listExtras.to = to;
-  if (direction !== "all") listExtras.direction = direction;
-  if (limit !== DEFAULT_LIST_PAGE_SIZE) listExtras.limit = String(limit);
+  const page = Math.min(rawPage, totalPages);
+  const skip = (page - 1) * limit;
 
-  function filterUrl(overrides: Record<string, string | undefined>) {
-    const merged = { ...listExtras, ...overrides };
-    const cleaned: Record<string, string> = {};
-    for (const [k, v] of Object.entries(merged)) {
-      if (v) cleaned[k] = v;
-    }
-    return buildSimpleListUrl("/dashboard/transfers", 1, limit, cleaned);
-  }
+  const transfers = await prisma.stockTransfer.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    skip,
+    take: limit,
+    include: {
+      fromStore: { select: { name: true } },
+      toStore: { select: { name: true } },
+      createdBy: { select: { name: true } },
+      lines: { select: { product: { select: { id: true, name: true } } } },
+    },
+  });
+
+  const extras = transferListExtras(
+    from,
+    to,
+    direction,
+    counterpartyId,
+    product,
+    transferNo,
+    batch,
+    recordedBy,
+    limit,
+  );
+  const clearHref = buildSimpleListUrl("/dashboard/transfers", 1, limit, {
+    ...(limit !== DEFAULT_LIST_PAGE_SIZE ? { limit: String(limit) } : {}),
+  });
+  const monthFrom = formatAppMonthStartYmd();
+  const monthTo = formatAppMonthEndYmd();
+  const resetThisMonthHref = buildSimpleListUrl("/dashboard/transfers", 1, limit, {
+    ...extras,
+    from: monthFrom,
+    to: monthTo,
+  });
+
+  const hasActiveFilters = !!(
+    from ||
+    to ||
+    direction !== "all" ||
+    counterpartyId ||
+    product ||
+    transferNo ||
+    batch ||
+    recordedBy
+  );
+  let activeFilterCount = 0;
+  if (from || to) activeFilterCount += 1;
+  if (direction !== "all") activeFilterCount += 1;
+  if (counterpartyId) activeFilterCount += 1;
+  if (product) activeFilterCount += 1;
+  if (transferNo) activeFilterCount += 1;
+  if (batch) activeFilterCount += 1;
+  if (recordedBy) activeFilterCount += 1;
+
+  const emptyMessage = hasActiveFilters ? "No transfers match these filters." : "No transfers yet.";
 
   return (
     <div className="space-y-4">
@@ -104,34 +194,28 @@ export default async function TransfersPage({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <div>
-          <label htmlFor="direction" className="block text-xs font-medium text-zinc-500">
-            Direction
-          </label>
-          <div className="mt-1 flex flex-wrap gap-2">
-            {(
-              [
-                ["all", "All"],
-                ["out", "Sent out"],
-                ["in", "Received"],
-              ] as const
-            ).map(([val, label]) => (
-              <Link
-                key={val}
-                href={filterUrl({ direction: val === "all" ? undefined : val, page: undefined })}
-                className={`rounded-lg px-3 py-1.5 text-sm ${
-                  direction === val
-                    ? "bg-brand-blue/20 font-medium text-brand-blue-light ring-1 ring-brand-blue/40"
-                    : "border border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                }`}
-              >
-                {label}
-              </Link>
-            ))}
-          </div>
-        </div>
-      </div>
+      <MobileFilterSheet
+        title="Filter transfers"
+        description="Filter by date, direction, branch, product, transfer number, batch, or who recorded it."
+        activeCount={activeFilterCount}
+      >
+        <TransfersFilterForm
+          key={[from, to, direction, counterpartyId, product, transferNo, batch, recordedBy].join("\0")}
+          actionPath="/dashboard/transfers"
+          from={from}
+          to={to}
+          direction={direction}
+          counterpartyId={counterpartyId}
+          product={product}
+          transferNo={transferNo}
+          batch={batch}
+          recordedBy={recordedBy}
+          initialOptions={filterOptions}
+          hiddenLimit={limit !== DEFAULT_LIST_PAGE_SIZE ? String(limit) : undefined}
+          clearHref={clearHref}
+          resetThisMonthHref={resetThisMonthHref}
+        />
+      </MobileFilterSheet>
 
       <div className="hidden overflow-hidden rounded-xl border border-zinc-200 bg-white md:block dark:border-zinc-800 dark:bg-zinc-900">
         <table className="w-full text-left text-sm">
@@ -141,7 +225,7 @@ export default async function TransfersPage({
               <th className="px-4 py-3">No.</th>
               <th className="px-4 py-3">Direction</th>
               <th className="px-4 py-3">Counterparty</th>
-              <th className="px-4 py-3">Lines</th>
+              <th className="px-4 py-3">Items</th>
               <th className="px-4 py-3">By</th>
             </tr>
           </thead>
@@ -171,16 +255,16 @@ export default async function TransfersPage({
                     </span>
                   </td>
                   <td className="px-4 py-3">{isOut ? t.toStore.name : t.fromStore.name}</td>
-                  <td className="px-4 py-3 tabular-nums">{t._count.lines}</td>
+                  <td className="max-w-xs px-4 py-3">
+                    <TransferItemNames lines={t.lines} />
+                  </td>
                   <td className="px-4 py-3">{t.createdBy.name}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-        {transfers.length === 0 ? (
-          <p className="px-4 py-8 text-center text-zinc-500">No transfers yet.</p>
-        ) : null}
+        {transfers.length === 0 ? <p className="px-4 py-8 text-center text-zinc-500">{emptyMessage}</p> : null}
       </div>
 
       <ul className="space-y-2 md:hidden">
@@ -200,15 +284,16 @@ export default async function TransfersPage({
                   {isOut ? "To" : "From"} {isOut ? t.toStore.name : t.fromStore.name}
                 </p>
                 <p className="mt-1 text-xs text-zinc-500">
-                  {isOut ? "Sent out" : "Received"} · {t._count.lines} lines · {t.createdBy.name}
+                  {isOut ? "Sent out" : "Received"} · {t.createdBy.name}
+                </p>
+                <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
+                  <TransferItemNames lines={t.lines} />
                 </p>
               </Link>
             </li>
           );
         })}
-        {transfers.length === 0 ? (
-          <p className="py-8 text-center text-sm text-zinc-500">No transfers yet.</p>
-        ) : null}
+        {transfers.length === 0 ? <p className="py-8 text-center text-sm text-zinc-500">{emptyMessage}</p> : null}
       </ul>
 
       {total > 0 ? (
@@ -217,17 +302,17 @@ export default async function TransfersPage({
             basePath="/dashboard/transfers"
             currentLimit={limit}
             totalItems={total}
-            extraHidden={listExtras}
+            extraHidden={extras}
           />
           <ListPaginationNav
             label="Transfers"
             page={page}
             totalPages={totalPages}
             totalItems={total}
-            prevHref={buildSimpleListUrl("/dashboard/transfers", page - 1, limit, listExtras)}
-            nextHref={buildSimpleListUrl("/dashboard/transfers", page + 1, limit, listExtras)}
+            prevHref={buildSimpleListUrl("/dashboard/transfers", page - 1, limit, extras)}
+            nextHref={buildSimpleListUrl("/dashboard/transfers", page + 1, limit, extras)}
             basePath="/dashboard/transfers"
-            extraHidden={listExtras}
+            extraHidden={extras}
           />
         </div>
       ) : null}

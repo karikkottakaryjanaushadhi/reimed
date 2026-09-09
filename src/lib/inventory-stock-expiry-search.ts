@@ -16,3 +16,11 @@ export function parseInventorySearch(q: string): InventorySearch | null {
 export function inventoryLotSearchAndClause(s: InventorySearch): Prisma.Sql {
   return Prisma.sql`AND replace(lower(p."name"), ' ', '') LIKE ${s.likePat}`;
 }
+
+/** Batches page: product name or batch number. */
+export function inventoryLotSearchIncludingBatchAndClause(s: InventorySearch): Prisma.Sql {
+  return Prisma.sql`AND (
+    replace(lower(p."name"), ' ', '') LIKE ${s.likePat}
+    OR replace(lower(il."batchNo"), ' ', '') LIKE ${s.likePat}
+  )`;
+}

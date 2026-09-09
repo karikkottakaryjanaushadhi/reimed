@@ -3,34 +3,30 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-export function StockProductNameField({
+export function StockGenericNameField({
   productId,
-  name,
+  genericName,
   canEdit,
   compact,
 }: {
   productId: string;
-  name: string;
+  genericName: string | null;
   canEdit: boolean;
   compact?: boolean;
 }) {
   const router = useRouter();
-  const [value, setValue] = useState(name);
+  const saved = genericName ?? "";
+  const [value, setValue] = useState(saved);
   const [pending, setPending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    setValue(name);
-  }, [name, productId]);
+    setValue(genericName ?? "");
+  }, [genericName, productId]);
 
   const save = useCallback(async () => {
     const t = value.trim();
-    if (!t) {
-      setErr("Name required");
-      setValue(name);
-      return;
-    }
-    if (t === name.trim()) {
+    if (t === saved.trim()) {
       setErr(null);
       return;
     }
@@ -40,23 +36,25 @@ export function StockProductNameField({
       const res = await fetch(`/api/products/${productId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: t }),
+        body: JSON.stringify({ genericName: t }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "Update failed");
       router.refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed");
-      setValue(name);
+      setValue(saved);
     } finally {
       setPending(false);
     }
-  }, [productId, name, value, router]);
+  }, [productId, saved, value, router]);
+
+  const display = genericName?.trim() || "—";
 
   if (!canEdit) {
     return (
-      <span className="break-words" title={name}>
-        {name}
+      <span className="block truncate text-zinc-600 dark:text-zinc-400" title={display}>
+        {display}
       </span>
     );
   }
@@ -64,11 +62,11 @@ export function StockProductNameField({
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <input
-        aria-label="Product name"
+        aria-label="Generic name"
         className={
           compact
             ? "w-full min-w-0 rounded border border-zinc-300 bg-white px-1 py-1 text-[11px] text-zinc-900 shadow-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
-            : "w-full min-w-[8rem] max-w-[24rem] rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 shadow-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+            : "w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 shadow-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
         }
         value={value}
         disabled={pending}

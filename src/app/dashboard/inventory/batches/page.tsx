@@ -13,7 +13,11 @@ import {
   listPageSizeInputMax,
   parseListLimitParam,
 } from "@/lib/list-pagination";
-import { getInventoryFilterOptions } from "@/lib/inventory-filter-options";
+import {
+  getInventoryFilterOptions,
+  inventoryLotExtraFilterClauses,
+  parseInventoryLotQtyFilter,
+} from "@/lib/inventory-filter-options";
 import { lotPackSize } from "@/lib/inventory-lot-pack-size";
 import { prisma } from "@/lib/prisma";
 import {
@@ -24,9 +28,10 @@ import {
   resolveExpiryFilter,
 } from "@/lib/inventory-expiry-filter";
 import {
-  inventoryLotSearchAndClause,
+  inventoryLotSearchIncludingBatchAndClause,
   parseInventorySearch,
 } from "@/lib/inventory-stock-expiry-search";
+import { parseProductCategoryFilter, parseProductScheduleFilter, parseProductTypeFilter } from "@/lib/products-filter-options";
 import { getBrandOptions } from "@/lib/brand-options";
 import { gstPctNumber } from "@/lib/product-gst-slabs";
 import {
@@ -45,6 +50,23 @@ type BatchFilters = {
   expiry: string;
   expiryOn: string;
   lowStock: boolean;
+  category: string;
+  type: string;
+  schedule: string;
+  qty: string;
+};
+
+const EMPTY_BATCH_FILTERS: BatchFilters = {
+  q: "",
+  supplierId: "",
+  brandId: "",
+  expiry: "",
+  expiryOn: "",
+  lowStock: false,
+  category: "",
+  type: "",
+  schedule: "",
+  qty: "",
 };
 
 function batchSortToggleDir(
@@ -68,6 +90,10 @@ function batchPaginationHidden(
   if (filters.expiryOn.trim()) e.expiryOn = filters.expiryOn.trim();
   else if (filters.expiry.trim()) e.expiry = filters.expiry.trim();
   if (filters.lowStock) e.lowStock = "1";
+  if (filters.category.trim()) e.category = filters.category.trim();
+  if (filters.type.trim()) e.type = filters.type.trim();
+  if (filters.schedule.trim()) e.schedule = filters.schedule.trim();
+  if (filters.qty.trim()) e.qty = filters.qty.trim();
   if (blimit !== DEFAULT_LIST_PAGE_SIZE) e.blimit = String(blimit);
   if (sort !== "productName") e.sort = sort;
   if (dir !== "asc") e.dir = dir;
@@ -142,6 +168,10 @@ function BatchPageSizeControls({
           <input type="hidden" name="expiry" value={filters.expiry} />
         ) : null}
         {filters.lowStock ? <input type="hidden" name="lowStock" value="1" /> : null}
+        {filters.category ? <input type="hidden" name="category" value={filters.category} /> : null}
+        {filters.type ? <input type="hidden" name="type" value={filters.type} /> : null}
+        {filters.schedule ? <input type="hidden" name="schedule" value={filters.schedule} /> : null}
+        {filters.qty ? <input type="hidden" name="qty" value={filters.qty} /> : null}
         {sort !== "productName" ? <input type="hidden" name="sort" value={sort} /> : null}
         {dir !== "asc" ? <input type="hidden" name="dir" value={dir} /> : null}
         <input type="hidden" name="bpage" value={String(bpage)} />
@@ -190,6 +220,10 @@ export default async function InventoryBatchesPage({
     blimit?: string;
     sort?: string;
     dir?: string;
+    category?: string;
+    type?: string;
+    schedule?: string;
+    qty?: string;
   }>;
 }) {
   const ctx = await getAuthContext();
@@ -227,6 +261,10 @@ export default async function InventoryBatchesPage({
   const expiryOnRaw = typeof sp.expiryOn === "string" ? sp.expiryOn : "";
   const { preset: expiryPreset, expiryOnYmd: expiryOnFilter } = resolveExpiryFilter(expiryRaw, expiryOnRaw);
   const lowStockOnly = sp.lowStock === "1";
+  const category = parseProductCategoryFilter(sp.category);
+  const type = parseProductTypeFilter(sp.type);
+  const schedule = parseProductScheduleFilter(sp.schedule);
+  const qty = parseInventoryLotQtyFilter(sp.qty);
   const batchPageSize = parseListLimitParam(sp.blimit);
 
   const today = startOfDay(new Date());
@@ -241,6 +279,10 @@ export default async function InventoryBatchesPage({
     expiry: expiryRaw,
     expiryOn: expiryOnRaw,
     lowStock: lowStockOnly,
+    category,
+    type,
+    schedule,
+    qty,
   });
 
   const brandOptions = await getBrandOptions();
@@ -335,7 +377,8 @@ export default async function InventoryBatchesPage({
   const lowStockClause = lowStockOnly ? Prisma.sql`AND il."quantity" <= p."reorderMin"` : Prisma.sql``;
 
   const search = parseInventorySearch(q);
-  const searchClause = search ? inventoryLotSearchAndClause(search) : Prisma.sql``;
+  const searchClause = search ? inventoryLotSearchIncludingBatchAndClause(search) : Prisma.sql``;
+  const extra = inventoryLotExtraFilterClauses({ category, type, schedule, qty });
 
   const filters: BatchFilters = {
     q,
@@ -344,6 +387,10 @@ export default async function InventoryBatchesPage({
     expiry: expiryPreset,
     expiryOn: expiryOnFilter,
     lowStock: lowStockOnly,
+    category,
+    type,
+    schedule,
+    qty,
   };
 
   const [batchCountRow] = await prisma.$queryRaw<Array<{ c: unknown }>>(
@@ -357,6 +404,10 @@ export default async function InventoryBatchesPage({
       ${brandClause}
       ${expiryClause}
       ${lowStockClause}
+      ${extra.categoryClause}
+      ${extra.typeClause}
+      ${extra.scheduleClause}
+      ${extra.qtyClause}
     `,
   );
   const batchTotal = toCount(batchCountRow?.c);
@@ -377,6 +428,10 @@ export default async function InventoryBatchesPage({
       ${brandClause}
       ${expiryClause}
       ${lowStockClause}
+      ${extra.categoryClause}
+      ${extra.typeClause}
+      ${extra.scheduleClause}
+      ${extra.qtyClause}
       ORDER BY ${batchSortOrder(sort, dir)}
       LIMIT ${batchPageSize} OFFSET ${batchSkip}
     `,
@@ -549,6 +604,10 @@ export default async function InventoryBatchesPage({
   if (brandFilterId) activeFilterCount += 1;
   if (hasActiveExpiryFilter(expiryPreset, expiryOnFilter)) activeFilterCount += 1;
   if (lowStockOnly) activeFilterCount += 1;
+  if (category) activeFilterCount += 1;
+  if (type) activeFilterCount += 1;
+  if (schedule) activeFilterCount += 1;
+  if (qty) activeFilterCount += 1;
 
   const exportHref = buildBatchUrl(filters, 1, DEFAULT_LIST_PAGE_SIZE, sort, dir, EXPORT_BASE);
 
@@ -561,18 +620,17 @@ export default async function InventoryBatchesPage({
         </Link>
       </div>
 
-      <MobileFilterSheet title="Filter batches" description="Search lots and narrow by supplier, brand, or expiry." activeCount={activeFilterCount}>
+      <MobileFilterSheet
+        title="Filter batches"
+        description="Search by product or batch number, and narrow by supplier, brand, category, type, schedule, qty, or expiry."
+        activeCount={activeFilterCount}
+      >
         <InventoryFiltersForm
           action={BASE}
+          variant="batches"
           filters={filters}
           initialOptions={filterOptions}
-          clearHref={buildBatchUrl(
-            { q: "", supplierId: "", brandId: "", expiry: "", expiryOn: "", lowStock: false },
-            1,
-            batchPageSize,
-            sort,
-            dir,
-          )}
+          clearHref={buildBatchUrl(EMPTY_BATCH_FILTERS, 1, batchPageSize, sort, dir)}
           exportHref={exportHref}
           hiddenFields={
             <>

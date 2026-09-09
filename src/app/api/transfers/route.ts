@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createdAtDayRange, trimDateParam } from "@/lib/date-range-filter";
+import { trimDateParam } from "@/lib/date-range-filter";
 import { getAuthContext, isManager, isManagerOfStore } from "@/lib/auth-context";
 import { executeStockTransferInTransaction } from "@/lib/inventory-lot-transfer";
 import { parseListLimitParam } from "@/lib/list-pagination";
 import { prisma } from "@/lib/prisma";
 import { storeUpperOpt } from "@/lib/store-text";
+import { buildTransferFilterWhere, parseTransferDirection } from "@/lib/transfers-filter-options";
 
 const lineSchema = z.object({
   sourceLotId: z.string().min(1),
@@ -46,36 +47,30 @@ function transferApiError(err: unknown): { status: number; error: string } {
   }
 }
 
-function parseDirection(raw: string | null): "in" | "out" | "all" {
-  if (raw === "in" || raw === "out") return raw;
-  return "all";
-}
-
 export async function GET(req: Request) {
   const ctx = await getAuthContext();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
-  const direction = parseDirection(searchParams.get("direction"));
+  const direction = parseTransferDirection(searchParams.get("direction"));
   const from = trimDateParam(searchParams.get("from"));
   const to = trimDateParam(searchParams.get("to"));
-  const dateFilter = createdAtDayRange(from, to);
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
   const limit = parseListLimitParam(searchParams.get("limit"));
   const skip = (page - 1) * limit;
 
   const storeId = ctx.activeStoreId;
-  const directionWhere =
-    direction === "in"
-      ? { toStoreId: storeId }
-      : direction === "out"
-        ? { fromStoreId: storeId }
-        : { OR: [{ fromStoreId: storeId }, { toStoreId: storeId }] };
-
-  const where = {
-    ...directionWhere,
-    ...(dateFilter ? { createdAt: dateFilter } : {}),
-  };
+  const where = buildTransferFilterWhere({
+    storeId,
+    from: from || undefined,
+    to: to || undefined,
+    direction,
+    counterpartyId: searchParams.get("branch") ?? undefined,
+    product: searchParams.get("product") ?? undefined,
+    transferNo: searchParams.get("transferNo") ?? undefined,
+    batch: searchParams.get("batch") ?? undefined,
+    recordedBy: searchParams.get("recordedBy") ?? undefined,
+  });
 
   const [transfers, total] = await Promise.all([
     prisma.stockTransfer.findMany({

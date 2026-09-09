@@ -1,11 +1,14 @@
 import { Prisma } from "@prisma/client";
-import { drugCodeSearchLikePattern } from "@/lib/drug-code";
-import { gstPctNumber, isProductGstSlab } from "@/lib/product-gst-slabs";
+import { gstPctNumber } from "@/lib/product-gst-slabs";
 import { prisma } from "@/lib/prisma";
 import type { ProductListRow } from "@/lib/product-list-row";
-import type { ProductStockFilter } from "@/lib/products-filter-options";
+import {
+  productCatalogWhereParts,
+  type ProductStockFilter,
+} from "@/lib/products-filter-options";
 
 export type { ProductListRow };
+export type { ProductStockFilter };
 
 export type ProductListSort =
   | "name"
@@ -24,6 +27,10 @@ export type ProductListQueryParams = {
   brand?: string;
   gst?: string;
   stock?: ProductStockFilter;
+  category?: string;
+  type?: string;
+  schedule?: string;
+  supplier?: string;
   sort?: string;
   dir?: string;
 };
@@ -81,40 +88,12 @@ export function parseProductListDir(raw: unknown): "asc" | "desc" {
 }
 
 function buildProductListSql(params: ProductListQueryParams) {
-  const q = params.q?.trim() ?? "";
-  const brand = params.brand?.trim() ?? "";
-  const gstRaw = params.gst?.trim() ?? "";
-  const gst = gstRaw && isProductGstSlab(Number(gstRaw)) ? gstRaw : "";
   const stock = parseProductStockFilter(params.stock);
   const sort = parseProductListSort(params.sort);
   const dir = parseProductListDir(params.dir);
   const storeId = params.storeId;
-
-  const qPat = q ? `%${q}%` : null;
-  const brandPat = brand ? `%${brand}%` : null;
-  const gstNum = gst ? Number(gst) : null;
   const stockExpr = Prisma.sql`COALESCE(SUM(il."quantity") FILTER (WHERE il."storeId" = ${storeId}), 0)`;
-
-  const whereParts: Prisma.Sql[] = [Prisma.sql`TRUE`];
-  if (qPat) {
-    const codePat = drugCodeSearchLikePattern(q);
-    const skuClause = codePat ? Prisma.sql`OR p."sku" ILIKE ${codePat}` : Prisma.empty;
-    whereParts.push(
-      Prisma.sql`(
-        p."name" ILIKE ${qPat}
-        ${skuClause}
-        OR p."genericName" ILIKE ${qPat}
-        OR b."name" ILIKE ${qPat}
-      )`,
-    );
-  }
-  if (brandPat) {
-    whereParts.push(Prisma.sql`b."name" ILIKE ${brandPat}`);
-  }
-  if (gstNum != null) {
-    whereParts.push(Prisma.sql`p."gstPct" = ${gstNum}`);
-  }
-  const whereSql = Prisma.join(whereParts, " AND ");
+  const whereSql = Prisma.join(productCatalogWhereParts(params), " AND ");
 
   let havingSql = Prisma.empty;
   if (stock === "low") {
@@ -125,7 +104,7 @@ function buildProductListSql(params: ProductListQueryParams) {
     havingSql = Prisma.sql`HAVING ${stockExpr} > 0`;
   }
 
-  return { whereSql, havingSql, stockExpr, sort, dir, storeId, q, brand, gst, stock };
+  return { whereSql, havingSql, stockExpr, sort, dir, storeId };
 }
 
 function mapProductListRows(

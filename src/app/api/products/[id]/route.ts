@@ -4,8 +4,6 @@ import { z } from "zod";
 import { getAuthContext, isManager } from "@/lib/auth-context";
 import {
   drugCodeFromUserInput,
-  isJanaushadhiDrugSku,
-  JANAUSHADHI_DRUG_CODE_REQUIRED_ERROR,
   janaushadhiDrugCodeValidationError,
 } from "@/lib/drug-code";
 import { prisma } from "@/lib/prisma";
@@ -66,8 +64,6 @@ export async function PATCH(
     const drugErr = janaushadhiDrugCodeValidationError(category, parsed.data.drugCode);
     if (drugErr) return NextResponse.json({ error: drugErr }, { status: 400 });
     nextDrugCode = drugCodeFromUserInput(parsed.data.drugCode, category);
-  } else if (category === "JANAUSHADHI" && !isJanaushadhiDrugSku(existing.sku)) {
-    return NextResponse.json({ error: JANAUSHADHI_DRUG_CODE_REQUIRED_ERROR }, { status: 400 });
   }
 
   try {

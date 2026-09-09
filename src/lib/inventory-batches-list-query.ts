@@ -6,11 +6,17 @@ import {
   resolveExpiryFilter,
 } from "@/lib/inventory-expiry-filter";
 import {
-  inventoryLotSearchAndClause,
+  inventoryLotSearchIncludingBatchAndClause,
   parseInventorySearch,
 } from "@/lib/inventory-stock-expiry-search";
+import {
+  inventoryLotExtraFilterClauses,
+  parseInventoryLotQtyFilter,
+  type InventoryLotQtyFilter,
+} from "@/lib/inventory-filter-options";
 import { lotPackSize } from "@/lib/inventory-lot-pack-size";
 import { gstPctNumber } from "@/lib/product-gst-slabs";
+import { parseProductCategoryFilter, parseProductScheduleFilter, parseProductTypeFilter } from "@/lib/products-filter-options";
 import { prisma } from "@/lib/prisma";
 import {
   resolveStockLevelsFilters,
@@ -144,14 +150,22 @@ function batchSortOrder(sort: InventoryBatchesSort, dir: "asc" | "desc") {
   }
 }
 
-function buildBatchFilterClauses(filters: StockLevelsFilters) {
+export type InventoryBatchesFilters = StockLevelsFilters & {
+  category: string;
+  type: string;
+  schedule: string;
+  qty: InventoryLotQtyFilter;
+};
+
+function buildBatchFilterClauses(filters: InventoryBatchesFilters) {
   const { preset: expiryPreset, expiryOnYmd: expiryOnFilter } = resolveExpiryFilter(
     filters.expiry,
     filters.expiryOn,
   );
   const search = parseInventorySearch(filters.q);
+  const extra = inventoryLotExtraFilterClauses(filters);
   return {
-    searchClause: search ? inventoryLotSearchAndClause(search) : Prisma.sql``,
+    searchClause: search ? inventoryLotSearchIncludingBatchAndClause(search) : Prisma.sql``,
     supplierClause: filters.supplierId
       ? Prisma.sql`AND il."supplierId" = ${filters.supplierId}`
       : Prisma.sql``,
@@ -163,14 +177,36 @@ function buildBatchFilterClauses(filters: StockLevelsFilters) {
     lowStockClause: filters.lowStock
       ? Prisma.sql`AND il."quantity" <= p."reorderMin"`
       : Prisma.sql``,
+    extra,
   };
 }
 
-export { resolveStockLevelsFilters as resolveInventoryBatchesFilters };
+export async function resolveInventoryBatchesFilters(params: {
+  storeId: string;
+  q?: string;
+  supplierId?: string;
+  brandId?: string;
+  expiry?: string;
+  expiryOn?: string;
+  lowStock?: boolean;
+  category?: string;
+  type?: string;
+  schedule?: string;
+  qty?: string;
+}): Promise<InventoryBatchesFilters> {
+  const base = await resolveStockLevelsFilters(params);
+  return {
+    ...base,
+    category: parseProductCategoryFilter(params.category),
+    type: parseProductTypeFilter(params.type),
+    schedule: parseProductScheduleFilter(params.schedule),
+    qty: parseInventoryLotQtyFilter(params.qty),
+  };
+}
 
 export async function queryInventoryBatches(params: {
   storeId: string;
-  filters: StockLevelsFilters;
+  filters: InventoryBatchesFilters;
   sort?: string;
   dir?: string;
   limit?: number;
@@ -197,6 +233,10 @@ export async function queryInventoryBatches(params: {
       ${clauses.brandClause}
       ${clauses.expiryClause}
       ${clauses.lowStockClause}
+      ${clauses.extra.categoryClause}
+      ${clauses.extra.typeClause}
+      ${clauses.extra.scheduleClause}
+      ${clauses.extra.qtyClause}
       ORDER BY ${batchSortOrder(sort, dir)}
       ${limitClause}
     `,

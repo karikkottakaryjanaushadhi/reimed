@@ -4,19 +4,30 @@ import Link from "next/link";
 import { useCallback, useRef } from "react";
 import { FilterOptionsCombobox } from "@/components/filter-options-combobox";
 import { readFormParams, useCascadingFilterOptions } from "@/components/use-cascading-filter-options";
+import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS } from "@/lib/product-categories";
 import { PRODUCT_GST_SLABS } from "@/lib/product-gst-slabs";
+import { PRODUCT_SCHEDULES, PRODUCT_SCHEDULE_LABELS } from "@/lib/product-schedules";
+import { PRODUCT_TYPES, PRODUCT_TYPE_LABELS } from "@/lib/product-types";
 import type { ProductStockFilter } from "@/lib/products-filter-options";
 
 export type { ProductStockFilter };
 
-const FILTER_FIELDS = ["q", "brand", "gst", "stock"] as const;
+const FILTER_FIELDS = ["q", "brand", "supplier", "category", "type", "schedule", "gst", "stock"] as const;
+
+const fieldCls =
+  "rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-brand-blue-light dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100";
 
 export function ProductsFilterForm({
   q,
   brand,
+  supplier,
+  category,
+  type,
+  schedule,
   gst,
   stock,
   initialBrands,
+  initialSuppliers,
   hiddenLimit,
   hiddenSort,
   hiddenDir,
@@ -25,9 +36,14 @@ export function ProductsFilterForm({
 }: {
   q: string;
   brand: string;
+  supplier: string;
+  category: string;
+  type: string;
+  schedule: string;
   gst: string;
   stock: ProductStockFilter;
   initialBrands: string[];
+  initialSuppliers: string[];
   hiddenLimit?: string;
   hiddenSort?: string;
   hiddenDir?: string;
@@ -42,7 +58,7 @@ export function ProductsFilterForm({
   );
 
   const { options, refresh } = useCascadingFilterOptions(
-    { brands: initialBrands },
+    { brands: initialBrands, suppliers: initialSuppliers },
     "/api/dashboard/products/filter-options",
     readParams,
   );
@@ -52,7 +68,7 @@ export function ProductsFilterForm({
       ref={formRef}
       method="get"
       action="/dashboard/products"
-      className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+      className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
     >
       {hiddenLimit ? <input type="hidden" name="limit" value={hiddenLimit} /> : null}
       {hiddenSort ? <input type="hidden" name="sort" value={hiddenSort} /> : null}
@@ -67,7 +83,7 @@ export function ProductsFilterForm({
           onChange={refresh}
           placeholder="Name, drug code, brand or generic…"
           autoComplete="off"
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-brand-blue-light dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+          className={fieldCls}
         />
       </label>
 
@@ -80,19 +96,62 @@ export function ProductsFilterForm({
           placeholder="Brand name"
           ariaLabel="Brand names"
           options={options.brands}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-brand-blue-light dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+          className={fieldCls}
         />
       </label>
 
       <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Supplier</span>
+        <FilterOptionsCombobox
+          name="supplier"
+          defaultValue={supplier}
+          onInputChange={refresh}
+          placeholder="Supplier name"
+          ariaLabel="Supplier names"
+          options={options.suppliers}
+          className={fieldCls}
+        />
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Category</span>
+        <select name="category" defaultValue={category} onChange={refresh} className={fieldCls} aria-label="Category">
+          <option value="">All</option>
+          {PRODUCT_CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {PRODUCT_CATEGORY_LABELS[c]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Type</span>
+        <select name="type" defaultValue={type} onChange={refresh} className={fieldCls} aria-label="Type">
+          <option value="">All</option>
+          {PRODUCT_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {PRODUCT_TYPE_LABELS[t]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Schedule</span>
+        <select name="schedule" defaultValue={schedule} onChange={refresh} className={fieldCls} aria-label="Schedule">
+          <option value="">All</option>
+          {PRODUCT_SCHEDULES.map((s) => (
+            <option key={s} value={s}>
+              {PRODUCT_SCHEDULE_LABELS[s]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1">
         <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">GST %</span>
-        <select
-          name="gst"
-          defaultValue={gst}
-          onChange={refresh}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
-          aria-label="GST slab"
-        >
+        <select name="gst" defaultValue={gst} onChange={refresh} className={fieldCls} aria-label="GST slab">
           <option value="">All</option>
           {PRODUCT_GST_SLABS.map((p) => (
             <option key={p} value={String(p)}>
@@ -104,13 +163,7 @@ export function ProductsFilterForm({
 
       <label className="flex flex-col gap-1">
         <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Stock</span>
-        <select
-          name="stock"
-          defaultValue={stock}
-          onChange={refresh}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
-          aria-label="Stock level"
-        >
+        <select name="stock" defaultValue={stock} onChange={refresh} className={fieldCls} aria-label="Stock level">
           <option value="">All</option>
           <option value="in">In stock</option>
           <option value="low">Low stock</option>
@@ -118,7 +171,7 @@ export function ProductsFilterForm({
         </select>
       </label>
 
-      <div className="flex flex-wrap items-center gap-2 sm:col-span-2 xl:col-span-5">
+      <div className="flex flex-wrap items-center gap-2 sm:col-span-2 xl:col-span-4">
         <button
           type="submit"
           className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"

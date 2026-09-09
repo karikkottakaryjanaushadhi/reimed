@@ -7,6 +7,11 @@ import { productCategoryLabel } from "@/lib/product-categories";
 import { productTypeLabel } from "@/lib/product-types";
 import { productScheduleLabel } from "@/lib/product-schedules";
 import { parseProductStockFilter, queryProductList } from "@/lib/products-list-query";
+import {
+  parseProductCategoryFilter,
+  parseProductScheduleFilter,
+  parseProductTypeFilter,
+} from "@/lib/products-filter-options";
 
 export async function GET(req: Request) {
   const ctx = await getAuthContext();
@@ -17,6 +22,10 @@ export async function GET(req: Request) {
     storeId: ctx.activeStoreId,
     q: searchParams.get("q") ?? undefined,
     brand: searchParams.get("brand") ?? undefined,
+    supplier: searchParams.get("supplier") ?? undefined,
+    category: parseProductCategoryFilter(searchParams.get("category")),
+    type: parseProductTypeFilter(searchParams.get("type")),
+    schedule: parseProductScheduleFilter(searchParams.get("schedule")),
     gst: searchParams.get("gst") ?? undefined,
     stock: parseProductStockFilter(searchParams.get("stock")),
     sort: searchParams.get("sort") ?? undefined,

@@ -15,6 +15,10 @@ export async function GET(req: Request) {
     expiry: searchParams.get("expiry") ?? undefined,
     expiryOn: searchParams.get("expiryOn") ?? undefined,
     lowStock: searchParams.get("lowStock") === "1",
+    category: searchParams.get("category") ?? undefined,
+    type: searchParams.get("type") ?? undefined,
+    schedule: searchParams.get("schedule") ?? undefined,
+    qty: searchParams.get("qty") ?? undefined,
   });
 
   return NextResponse.json(options, {
