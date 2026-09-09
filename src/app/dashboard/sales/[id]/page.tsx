@@ -7,6 +7,7 @@ import { getAuthContext } from "@/lib/auth-context";
 import { canEditSale } from "@/lib/sale-editable";
 import { saleBillRoundOff, salePayableFromLineAmounts } from "@/lib/bill-round";
 import { netSaleTotal } from "@/lib/sale-return-aggregates";
+import { saleLinePackSize } from "@/lib/inventory-lot-pack-size";
 import { saleLineMarginPercent } from "@/lib/sale-line";
 import { prisma } from "@/lib/prisma";
 import {
@@ -89,7 +90,7 @@ export default async function SaleBillViewPage({ params }: { params: Promise<{ i
     const disc = Number(line.discountAmount);
     const gst = Number(line.gstAmount);
     const lineIncl = Math.round((gross - disc) * 100) / 100;
-    const packSize = Math.max(1, Math.trunc(Number(line.product.packSize)) || 1);
+    const packSize = saleLinePackSize(line);
     const mrgPct = saleLineMarginPercent(
       gross,
       disc,

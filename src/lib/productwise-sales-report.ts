@@ -20,6 +20,7 @@ const PRODUCTWISE_LINE_SELECT = {
   amount: true,
   discountAmount: true,
   gstAmount: true,
+  packSize: true,
   product: {
     select: {
       id: true,

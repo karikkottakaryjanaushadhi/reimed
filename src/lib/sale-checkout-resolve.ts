@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { roundBillGrandTotal, roundMoney } from "@/lib/bill-round";
 import { isInventoryLotExpired } from "@/lib/inventory-lot-expiry";
+import { lotPackSize } from "@/lib/inventory-lot-pack-size";
 import { saleLineGrossAmount, splitInclusiveGst } from "@/lib/sale-line";
 
 function round2(n: number): number {
@@ -77,6 +78,7 @@ export type ResolvedPosSaleLineRow = {
   productId: string;
   lotId: string;
   qty: number;
+  packSize: number;
   rate: number;
   amount: number;
   discountPct: number;
@@ -118,7 +120,7 @@ export async function resolvePosSaleLinesInTransaction(
     }
     if (isInventoryLotExpired(lot.expiryDate)) throw new Error("expired_lot");
     if (lot.quantity < line.qty) throw new Error("short_stock");
-    const packSize = Math.max(1, Math.trunc(lot.product.packSize) || 1);
+    const packSize = lotPackSize(lot);
     const mrp = Number(lot.mrp);
     const gstPctRaw = Number(lot.product.gstPct);
     const gstPct = Number.isFinite(gstPctRaw) ? gstPctRaw : 0;
@@ -139,6 +141,7 @@ export async function resolvePosSaleLinesInTransaction(
       productId: line.productId,
       lotId: line.lotId,
       qty: line.qty,
+      packSize,
       rate: line.rate,
       amount,
       discountPct,

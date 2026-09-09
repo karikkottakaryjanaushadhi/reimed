@@ -330,23 +330,24 @@ export async function POST(req: Request) {
         },
       });
 
-      for (const line of p.lines) {
-        const stockIn = line.quantity + line.freeQty;
+      for (const row of resolvedLines) {
+        const stockIn = row.quantity + row.freeQty;
         const saleFields = lotSalePricingFromPurchaseLine({
-          mrpPerPack: Number(line.mrp),
-          salesDiscountPct: Number(line.salesDiscountPct),
-          salesDiscountRs: Number(line.salesDiscountRs),
+          mrpPerPack: row.mrp,
+          salesDiscountPct: row.salesDiscountPct,
+          salesDiscountRs: row.salesDiscountRs,
         });
         await upsertInventoryLotStockFromPurchase(tx, {
           storeId,
-          productId: line.productId,
-          batchNo: line.batchNo,
-          expiryDate: line.expiryDate,
+          productId: row.productId,
+          batchNo: row.batchNo,
+          expiryDate: row.expiryDate,
           supplierId: parsed.data.supplierId,
           stockIn,
+          packSize: Math.max(1, row.pack),
           pricing: {
-            costPrice: line.costPrice,
-            mrp: line.mrp,
+            costPrice: new Prisma.Decimal(row.costPrice),
+            mrp: new Prisma.Decimal(row.mrp),
             saleRate: new Prisma.Decimal(saleFields.saleRate),
             salesDiscountPct: new Prisma.Decimal(saleFields.salesDiscountPct),
             salesDiscountRs: new Prisma.Decimal(saleFields.salesDiscountRs),
@@ -354,14 +355,10 @@ export async function POST(req: Request) {
         });
       }
 
-      // Keep Product.packSize and gstPct aligned with purchase line (POS / Batches read product master).
       for (const row of resolvedLines) {
         await tx.product.update({
           where: { id: row.productId },
-          data: {
-            packSize: Math.max(1, row.pack),
-            gstPct: snapProductGstPct(row.gstPct),
-          },
+          data: { gstPct: snapProductGstPct(row.gstPct) },
         });
       }
 

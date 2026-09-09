@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { saleLinePackSize } from "@/lib/inventory-lot-pack-size";
 import { saleLineCostAmount, saleLineMarginAmount } from "@/lib/sale-line";
 import { roundMoney } from "@/lib/sale-return-aggregates";
 
@@ -38,7 +39,8 @@ type SaleLineRow = {
   amount: unknown;
   discountAmount: unknown;
   gstAmount: unknown;
-  product: { packSize: unknown };
+  packSize?: unknown;
+  product: { packSize?: unknown };
   lot: { costPrice: unknown };
   sale: {
     billNo: number;
@@ -56,7 +58,8 @@ type ReturnLineRow = {
     amount: unknown;
     discountAmount: unknown;
     gstAmount: unknown;
-    product: { packSize: unknown };
+    packSize?: unknown;
+    product: { packSize?: unknown };
     lot: { costPrice: unknown };
     sale: {
       billNo: number;
@@ -89,7 +92,7 @@ function ensureBill(map: Map<string, BillAgg>, line: SaleLineRow | ReturnLineRow
 }
 
 function applySaleLine(entry: BillAgg, line: SaleLineRow) {
-  const packSize = Number(line.product.packSize) || 1;
+  const packSize = saleLinePackSize(line);
   const qty = line.qty;
   const amount = Number(line.amount);
   const discountAmount = Number(line.discountAmount);
@@ -110,7 +113,7 @@ function applyReturnLine(entry: BillAgg, saleLine: ReturnLineRow["saleLine"], re
   const returnQty = returnLine.qty;
   if (soldQty <= 0 || returnQty <= 0) return;
 
-  const packSize = Number(saleLine.product.packSize) || 1;
+  const packSize = saleLinePackSize(saleLine);
   const ratio = returnQty / soldQty;
   const amount = Number(saleLine.amount);
   const discountAmount = Number(saleLine.discountAmount);

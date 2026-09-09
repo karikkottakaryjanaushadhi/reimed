@@ -8,6 +8,7 @@ import {
   randomPlaceholderCustomerName,
   randomPlaceholderDoctorName,
 } from "@/lib/sale-placeholders";
+import { saleLinePackSize } from "@/lib/inventory-lot-pack-size";
 import { posSaleLineInputSchema, resolvePosSaleLinesInTransaction } from "@/lib/sale-checkout-resolve";
 import { defaultSalePaid, resolveSaleCashReceived } from "@/lib/sale-paid";
 import { prisma } from "@/lib/prisma";
@@ -100,7 +101,7 @@ export async function GET(
           lotId: l.lotId,
           sku: l.product.sku,
           name: l.product.name,
-          packSize: l.product.packSize,
+          packSize: saleLinePackSize(l),
           batchNo: l.lot.batchNo,
           expiryDate: l.lot.expiryDate.toISOString(),
           mrp: Number(l.lot.mrp),
@@ -200,6 +201,7 @@ export async function PATCH(
               productId: r.productId,
               lotId: r.lotId,
               qty: r.qty,
+              packSize: r.packSize,
               rate: r.rate,
               amount: r.amount,
               discountPct: r.discountPct,

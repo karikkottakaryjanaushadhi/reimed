@@ -235,8 +235,13 @@ export function availableProductStock(stockQty: number, cart: readonly CartLine[
   return Math.max(0, stockQty - cartQtyByProductId(cart, productId));
 }
 
+export function lotBillingPackSize(lot: Lot): number {
+  const ps = lot.packSize ?? lot.product.packSize;
+  return Math.max(1, Math.trunc(ps) || 1);
+}
+
 export function defaultQtyForLot(lot: Lot): number {
-  const pack = Math.max(1, lot.product.packSize);
+  const pack = lotBillingPackSize(lot);
   return Math.min(pack, Math.max(1, lot.quantity));
 }
 

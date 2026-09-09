@@ -65,6 +65,7 @@ export async function PATCH(
   if (d.salesDiscountPct !== undefined) lotData.salesDiscountPct = new Prisma.Decimal(d.salesDiscountPct);
   if (d.salesDiscountRs !== undefined) lotData.salesDiscountRs = new Prisma.Decimal(d.salesDiscountRs);
   if (d.saleRate !== undefined) lotData.saleRate = new Prisma.Decimal(d.saleRate);
+  if (d.packSize !== undefined) lotData.packSize = d.packSize;
 
   const pricingTouch =
     d.mrp !== undefined ||
@@ -81,12 +82,6 @@ export async function PATCH(
       await tx.product.update({
         where: { id: existing.productId },
         data: { name: storeUpper(d.productName).slice(0, 500) },
-      });
-    }
-    if (d.packSize !== undefined) {
-      await tx.product.update({
-        where: { id: existing.productId },
-        data: { packSize: d.packSize },
       });
     }
     if (d.reorderMin !== undefined) {

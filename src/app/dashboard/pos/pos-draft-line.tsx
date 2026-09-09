@@ -26,6 +26,7 @@ import {
   availableProductStock,
   defaultQtyForLot,
   defaultRateForLot,
+  lotBillingPackSize,
   effectiveLineDiscountPct,
   formatLotExpiry,
   nominalDiscountPctFromLot,
@@ -346,7 +347,7 @@ export function useDraftLine({
     let gross = Number(raw);
     if (!Number.isFinite(gross) || gross < 0) gross = 0;
     const qn = Math.max(1, qty);
-    const ps = Math.max(1, Math.trunc(lot.product.packSize) || 1);
+    const ps = lotBillingPackSize(lot);
     const synced = syncMrpDiscountFields(lot.mrp, round2((gross * ps) / qn));
     setRate(synced.rate);
     setDiscountFromLotOnly(true);
@@ -368,7 +369,7 @@ export function useDraftLine({
     const { rate, discountPct } = applyMrpDiscountAmountToLine(
       qty,
       lot.mrp,
-      lot.product.packSize,
+      lotBillingPackSize(lot),
       raw,
     );
     setRate(rate);
@@ -442,7 +443,7 @@ export function useDraftLine({
       name: lot.product.name,
       batchNo: lot.batchNo,
       expiryDate: lot.expiryDate.slice(0, 10),
-      packSize: lot.product.packSize,
+      packSize: lotBillingPackSize(lot),
       gstPct: lot.product.gstPct ?? 0,
       qty,
       maxQty: lot.quantity,
@@ -538,7 +539,7 @@ export function useDraftLine({
         qty,
         rate,
         mrp: lot.mrp,
-        packSize: lot.product.packSize,
+        packSize: lotBillingPackSize(lot),
         discountPctOffRate: effectiveLineDiscountPct(rate, lot.mrp, discountPct, discountFromLotOnly),
         gstPct: draftGstPct ?? 0,
       })
@@ -552,7 +553,7 @@ export function useDraftLine({
           preview.gstAmount,
           qty,
           lot.costPrice,
-          lot.product.packSize,
+          lotBillingPackSize(lot),
         )
       : null;
   const addDisabled = !lot || lot.expired || lotAvailableQty < 1 || qty < 1 || qty > lotAvailableQty;
@@ -1128,7 +1129,7 @@ export function DraftLineTableRow({ draft }: { draft: DraftLineState }) {
         )}
       </td>
       <td className="px-1 py-2 align-middle text-right tabular-nums text-zinc-600 dark:text-zinc-300">
-        {lot ? lot.product.packSize : "—"}
+        {lot ? lotBillingPackSize(lot) : "—"}
       </td>
       <td className="px-1 py-2 align-middle text-right">
         <input

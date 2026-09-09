@@ -120,7 +120,7 @@ async function main() {
     process.exit(1);
   }
 
-  const tmpCsv = path.join(os.tmpdir(), `reimed_easytab_${Date.now()}.csv`);
+  const tmpCsv = path.join(os.tmpdir(), `medseb_easytab_${Date.now()}.csv`);
   const py = path.join(root, "scripts", "easytab_stock_export.py");
   execFileSync("python3", [py, scriptSql, tmpCsv], { stdio: "inherit", cwd: root });
 
@@ -279,6 +279,10 @@ async function main() {
           typeof row.scode === "number" && row.scode > 0 ? supplierIdByScode.get(row.scode) : undefined;
         const stockIn = Math.max(0, Math.floor(row.stock));
         if (stockIn <= 0) continue;
+        const product = await tx.product.findUnique({
+          where: { id: prod.id },
+          select: { packSize: true },
+        });
         await upsertInventoryLotStockFromPurchase(tx, {
           storeId: store.id,
           productId: prod.id,
@@ -286,6 +290,7 @@ async function main() {
           expiryDate: parseExpiry(row.expd ?? null),
           supplierId: sc ?? null,
           stockIn,
+          packSize: Math.max(1, product?.packSize ?? 1),
           pricing: {
             costPrice: toDecimal(row.rate),
             mrp: mrpD,

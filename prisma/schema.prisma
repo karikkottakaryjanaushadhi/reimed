@@ -135,6 +135,8 @@ model InventoryLot {
   batchNo           String
   expiryDate        DateTime
   quantity          Int
+  /// Units per strip/pack for this batch (billing / POS).
+  packSize          Int      @default(1)
   costPrice         Decimal
   mrp               Decimal
   /// Default selling rate per pack (POS-style); often ≤ MRP.
@@ -291,6 +293,8 @@ model SaleLine {
   productId      String
   lotId          String
   qty            Int
+  /// Snapshot at billing time (from lot pack size).
+  packSize       Int      @default(1)
   rate           Decimal
   amount         Decimal
   discountPct    Decimal      @default(0)

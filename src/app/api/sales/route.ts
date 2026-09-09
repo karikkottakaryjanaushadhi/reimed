@@ -118,6 +118,7 @@ export async function POST(req: Request) {
               productId: r.productId,
               lotId: r.lotId,
               qty: r.qty,
+              packSize: r.packSize,
               rate: r.rate,
               amount: r.amount,
               discountPct: r.discountPct,

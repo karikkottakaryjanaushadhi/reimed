@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthContext, isMemberOfStore } from "@/lib/auth-context";
+import { lotPackSize } from "@/lib/inventory-lot-pack-size";
 import { prisma } from "@/lib/prisma";
 
 type RouteCtx = { params: Promise<{ id: string }> };
@@ -19,7 +20,7 @@ export async function GET(_req: Request, { params }: RouteCtx) {
         orderBy: [{ batchNo: "asc" }, { expiryDate: "asc" }],
         include: {
           product: { select: { id: true, name: true, packSize: true } },
-          sourceLot: { select: { id: true, batchNo: true } },
+          sourceLot: { select: { id: true, batchNo: true, packSize: true, product: { select: { packSize: true } } } },
         },
       },
     },
@@ -49,7 +50,7 @@ export async function GET(_req: Request, { params }: RouteCtx) {
         sourceLotId: l.sourceLotId,
         productId: l.productId,
         productName: l.product.name,
-        packSize: l.product.packSize,
+        packSize: lotPackSize(l.sourceLot),
         batchNo: l.batchNo,
         expiryDate: l.expiryDate.toISOString(),
         quantity: l.quantity,

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getAuthContext, isManager } from "@/lib/auth-context";
+import { lotPackSize } from "@/lib/inventory-lot-pack-size";
 import { upsertInventoryLotStockFromPurchase, findInventoryLotByKey } from "@/lib/inventory-lot-upsert";
 import { lotSalePricingFromPurchaseLine } from "@/lib/inventory-lot-pricing";
 import { isInventoryLotExpired } from "@/lib/inventory-lot-expiry";
@@ -53,6 +54,7 @@ export async function GET(req: Request) {
       saleRate: true,
       salesDiscountPct: true,
       salesDiscountRs: true,
+      packSize: true,
       product: {
         select: { id: true, name: true, packSize: true, gstPct: true },
       },
@@ -74,6 +76,7 @@ export async function GET(req: Request) {
       salesDiscountPct: Number(lot.salesDiscountPct),
       salesDiscountRs: Number(lot.salesDiscountRs),
       supplierName: lot.supplier?.name ?? null,
+      packSize: lotPackSize(lot),
       product: {
         id: lot.product.id,
         name: lot.product.name,
@@ -125,6 +128,7 @@ export async function POST(req: Request) {
 
   try {
     const lot = await prisma.$transaction(async (tx) => {
+      const packSize = Math.max(1, d.pack ?? 1);
       await upsertInventoryLotStockFromPurchase(tx, {
         storeId,
         productId: d.productId,
@@ -132,6 +136,7 @@ export async function POST(req: Request) {
         expiryDate: d.expiryDate,
         supplierId: d.supplierId ?? null,
         stockIn,
+        packSize,
         pricing: {
           costPrice: new Prisma.Decimal(d.costPrice),
           mrp: new Prisma.Decimal(d.mrp),
@@ -141,13 +146,12 @@ export async function POST(req: Request) {
         },
       });
 
-      await tx.product.update({
-        where: { id: d.productId },
-        data: {
-          ...(d.pack !== undefined ? { packSize: Math.max(1, d.pack) } : {}),
-          ...(d.gstPct !== undefined ? { gstPct: snapProductGstPct(d.gstPct) } : {}),
-        },
-      });
+      if (d.gstPct !== undefined) {
+        await tx.product.update({
+          where: { id: d.productId },
+          data: { gstPct: snapProductGstPct(d.gstPct) },
+        });
+      }
 
       const lot = await findInventoryLotByKey(tx, {
         storeId,

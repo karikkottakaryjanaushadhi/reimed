@@ -1,3 +1,4 @@
+import { saleLinePackSize } from "@/lib/inventory-lot-pack-size";
 import { prisma } from "@/lib/prisma";
 import { buildDotmatrixReceiptHtml, buildDotmatrixReceiptText, type DotmatrixReceiptSale } from "@/lib/dotmatrix-receipt";
 
@@ -34,6 +35,7 @@ export async function getDotmatrixReceiptForSale(saleId: string, storeId: string
           discountAmount: true,
           gstAmount: true,
           gstPct: true,
+          packSize: true,
           product: {
             select: {
               name: true,
@@ -74,7 +76,7 @@ export async function getDotmatrixReceiptForSale(saleId: string, storeId: string
         name: l.product.name,
         brandName: l.product.brand?.name ?? null,
         genericName: l.product.genericName,
-        packSize: l.product.packSize,
+        packSize: saleLinePackSize(l),
       },
       lot: {
         batchNo: l.lot.batchNo,

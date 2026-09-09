@@ -220,6 +220,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         expiryDate,
         supplierId: purchase.supplierId,
         stockIn,
+        packSize: Math.max(1, pack),
         pricing: {
           costPrice: cp,
           mrp,
@@ -231,10 +232,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
       await tx.product.update({
         where: { id: productId },
-        data: {
-          packSize: Math.max(1, pack),
-          gstPct: snapProductGstPct(l.gstPct ?? 0),
-        },
+        data: { gstPct: snapProductGstPct(l.gstPct ?? 0) },
       });
 
       return created;

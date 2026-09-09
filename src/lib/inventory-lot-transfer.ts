@@ -22,6 +22,7 @@ async function incrementOrCreateDestinationLot(
     batchNo: string;
     expiryDate: Date;
     supplierId: string | null;
+    packSize: number;
     costPrice: Prisma.Decimal;
     mrp: Prisma.Decimal;
     saleRate: Prisma.Decimal;
@@ -53,6 +54,7 @@ async function incrementOrCreateDestinationLot(
         batchNo: sourceLot.batchNo,
         expiryDate: sourceLot.expiryDate,
         quantity: qty,
+        packSize: Math.max(1, Math.trunc(sourceLot.packSize) || 1),
         supplierId: sourceLot.supplierId,
         costPrice: sourceLot.costPrice,
         mrp: sourceLot.mrp,

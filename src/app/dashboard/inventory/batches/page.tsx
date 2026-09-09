@@ -14,6 +14,7 @@ import {
   parseListLimitParam,
 } from "@/lib/list-pagination";
 import { getInventoryFilterOptions } from "@/lib/inventory-filter-options";
+import { lotPackSize } from "@/lib/inventory-lot-pack-size";
 import { prisma } from "@/lib/prisma";
 import {
   EXPIRY_SOON_DAYS,
@@ -253,7 +254,7 @@ export default async function InventoryBatchesPage({
       case "gstPct":
         return Prisma.sql`p."gstPct" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
       case "packSize":
-        return Prisma.sql`p."packSize" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+        return Prisma.sql`il."packSize" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
       case "supplier":
         return Prisma.sql`COALESCE(s."name", '') ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
       case "batchNo":
@@ -415,7 +416,7 @@ export default async function InventoryBatchesPage({
       brandName: l.product.brand?.name?.trim() || null,
       productCategory: l.product.productCategory,
       gstPct: gstPctNumber(l.product.gstPct),
-      packSize: Math.max(1, Math.trunc(Number(l.product.packSize)) || 1),
+      packSize: lotPackSize(l),
       supplierName: l.supplier?.name ?? null,
       batchNo: l.batchNo,
       expiryDate: l.expiryDate.toISOString(),

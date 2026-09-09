@@ -127,6 +127,7 @@ export async function PATCH(
             expiryDate: newExpiryDate,
             supplierId,
             stockIn: newStockIn,
+            packSize: Math.max(1, parsed.data.pack),
             pricing: lotPricing,
           });
         } else {
@@ -137,6 +138,7 @@ export async function PATCH(
           await updateInventoryLotFromPurchase(tx, oldLot.id, {
             supplierId,
             quantity: nextQty,
+            packSize: Math.max(1, parsed.data.pack),
             pricing: lotPricing,
           });
         }
@@ -160,6 +162,7 @@ export async function PATCH(
           expiryDate: newExpiryDate,
           supplierId,
           stockIn: newStockIn,
+          packSize: Math.max(1, parsed.data.pack),
           pricing: lotPricing,
         });
       }
@@ -188,10 +191,7 @@ export async function PATCH(
 
       await tx.product.update({
         where: { id: parsed.data.productId },
-        data: {
-          packSize: Math.max(1, parsed.data.pack),
-          gstPct: snapProductGstPct(parsed.data.gstPct),
-        },
+        data: { gstPct: snapProductGstPct(parsed.data.gstPct) },
       });
 
       return line;

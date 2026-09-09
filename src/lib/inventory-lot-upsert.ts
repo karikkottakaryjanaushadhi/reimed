@@ -91,13 +91,16 @@ export async function upsertInventoryLotStockFromPurchase(
   args: InventoryLotKey & {
     supplierId: string | null;
     stockIn: number;
+    packSize: number;
     pricing: PurchaseLotPricing;
   },
 ): Promise<void> {
   const { storeId, productId, batchNo, expiryDate } = lotKeyFields(args);
   const pricingAt = new Date();
+  const packSize = Math.max(1, Math.trunc(args.packSize) || 1);
   const updateData = {
     quantity: { increment: args.stockIn },
+    packSize,
     costPrice: args.pricing.costPrice,
     mrp: args.pricing.mrp,
     supplierId: args.supplierId,
@@ -130,6 +133,7 @@ export async function upsertInventoryLotStockFromPurchase(
         batchNo,
         expiryDate,
         quantity: args.stockIn,
+        packSize,
         supplierId: args.supplierId,
         costPrice: args.pricing.costPrice,
         mrp: args.pricing.mrp,
@@ -157,6 +161,7 @@ export async function updateInventoryLotFromPurchase(
   args: {
     supplierId: string | null;
     quantity: number;
+    packSize: number;
     pricing: PurchaseLotPricing;
   },
 ): Promise<void> {
@@ -164,6 +169,7 @@ export async function updateInventoryLotFromPurchase(
     where: { id: lotId },
     data: {
       quantity: args.quantity,
+      packSize: Math.max(1, Math.trunc(args.packSize) || 1),
       costPrice: args.pricing.costPrice,
       mrp: args.pricing.mrp,
       supplierId: args.supplierId,

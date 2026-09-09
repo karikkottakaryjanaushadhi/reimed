@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { saleLinePackSize } from "@/lib/inventory-lot-pack-size";
 import { saleLineCostAmount, saleLineMarginAmount } from "@/lib/sale-line";
 import { roundMoney } from "@/lib/sale-return-aggregates";
 
@@ -46,7 +47,8 @@ type SaleLineRow = {
   amount: unknown;
   discountAmount: unknown;
   gstAmount: unknown;
-  product: { id: string; name: string; packSize: unknown };
+  packSize?: unknown;
+  product: { id: string; name: string; packSize?: unknown };
   lot: { costPrice: unknown; mrp: unknown };
 };
 
@@ -59,7 +61,8 @@ type ReturnLineRow = {
     amount: unknown;
     discountAmount: unknown;
     gstAmount: unknown;
-    product: { id: string; name: string; packSize: unknown };
+    packSize?: unknown;
+    product: { id: string; name: string; packSize?: unknown };
     lot: { costPrice: unknown; mrp: unknown };
   };
 };
@@ -71,13 +74,13 @@ function noteLotMrp(entry: Agg, rawMrp: unknown) {
   entry.mrpMax = entry.mrpMax == null ? mrp : Math.max(entry.mrpMax, mrp);
 }
 
-function ensureAgg(map: Map<string, Agg>, line: { product: { id: string; name: string; packSize: unknown } }): Agg {
+function ensureAgg(map: Map<string, Agg>, line: { product: { id: string; name: string; packSize?: unknown } }): Agg {
   let entry = map.get(line.product.id);
   if (!entry) {
     entry = {
       productId: line.product.id,
       productName: line.product.name,
-      packSize: Number(line.product.packSize) || 1,
+      packSize: 1,
       mrpMin: null,
       mrpMax: null,
       quantity: 0,
@@ -96,11 +99,12 @@ function ensureAgg(map: Map<string, Agg>, line: { product: { id: string; name: s
 }
 
 function applySaleLine(entry: Agg, line: SaleLineRow) {
+  const packSize = saleLinePackSize(line);
   const qty = line.qty;
   const amount = Number(line.amount);
   const discountAmount = Number(line.discountAmount);
   const gstAmount = Number(line.gstAmount);
-  const costAmount = saleLineCostAmount(qty, Number(line.lot.costPrice), entry.packSize);
+  const costAmount = saleLineCostAmount(qty, Number(line.lot.costPrice), packSize);
   const lineMargin = saleLineMarginAmount(amount, discountAmount, gstAmount, costAmount);
 
   noteLotMrp(entry, line.lot.mrp);
@@ -126,7 +130,7 @@ function applyReturnLine(entry: Agg, saleLine: ReturnLineRow["saleLine"], return
   const retAmount = roundMoney(amount * ratio);
   const retDiscount = roundMoney(discountAmount * ratio);
   const retTax = roundMoney(gstAmount * ratio);
-  const retCost = saleLineCostAmount(returnQty, Number(saleLine.lot.costPrice), entry.packSize);
+  const retCost = saleLineCostAmount(returnQty, Number(saleLine.lot.costPrice), saleLinePackSize(saleLine));
   const retMargin = saleLineMarginAmount(retAmount, retDiscount, retTax, retCost);
 
   noteLotMrp(entry, saleLine.lot.mrp);

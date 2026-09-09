@@ -14,6 +14,8 @@ export type Lot = {
   supplierName?: string | null;
   /** Past expiry calendar day (IST); not sellable at POS. */
   expired?: boolean;
+  /** Units per pack for this batch (billing). */
+  packSize: number;
   product: { id: string; name: string; packSize: number; gstPct: number };
 };
 

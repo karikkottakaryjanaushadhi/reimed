@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthContext, isManager } from "@/lib/auth-context";
 import { formatAppDateYmd, parseAppYmdStart } from "@/lib/app-timezone";
+import { lotPackSize } from "@/lib/inventory-lot-pack-size";
 import { purchaseLineDefaultGstPct } from "@/lib/product-gst-slabs";
 import { prisma } from "@/lib/prisma";
 
@@ -62,7 +63,7 @@ export async function GET(req: Request) {
       expiryDate,
       mrp,
       costPrice,
-      pack: product?.packSize ?? lastLine?.pack ?? 1,
+      pack: latestLot ? lotPackSize(latestLot) : product?.packSize ?? lastLine?.pack ?? 1,
       purchaseDiscountPct: lastLine ? Number(lastLine.purchaseDiscountPct) : 0,
       purchaseDiscountRs: lastLine ? Number(lastLine.purchaseDiscountRs) : 0,
       schemeDiscountPct: lastLine ? Number(lastLine.schemeDiscountPct) : 0,
