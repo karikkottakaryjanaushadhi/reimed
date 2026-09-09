@@ -16,6 +16,12 @@ import {
   PRODUCT_TYPE_LABELS,
   type ProductType,
 } from "@/lib/product-types";
+import {
+  DEFAULT_PRODUCT_SCHEDULE,
+  PRODUCT_SCHEDULES,
+  PRODUCT_SCHEDULE_LABELS,
+  type ProductSchedule,
+} from "@/lib/product-schedules";
 import { compactSearchKey } from "@/lib/search-normalize";
 import { drugCodeFormValue, JANAUSHADHI_DRUG_CODE_REQUIRED_ERROR } from "@/lib/drug-code";
 import { CatalogBrandSearchField } from "./catalog-brand-search-field";
@@ -34,6 +40,7 @@ export type ProductFormValues = {
   genericName: string;
   productCategory: ProductCategory;
   productType: ProductType;
+  productSchedule: ProductSchedule;
   packSize: number;
   reorderMin: number;
   gstPct: number;
@@ -56,6 +63,7 @@ function emptyValues(): ProductFormValues {
     genericName: "",
     productCategory: DEFAULT_PRODUCT_CATEGORY,
     productType: DEFAULT_PRODUCT_TYPE,
+    productSchedule: DEFAULT_PRODUCT_SCHEDULE,
     packSize: 10,
     reorderMin: 0,
     gstPct: 5,
@@ -82,6 +90,9 @@ export function ProductForm({
   const [productType, setProductType] = useState<ProductType>(
     initial?.productType ?? DEFAULT_PRODUCT_TYPE,
   );
+  const [productSchedule, setProductSchedule] = useState<ProductSchedule>(
+    initial?.productSchedule ?? DEFAULT_PRODUCT_SCHEDULE,
+  );
   const [brandQ, setBrandQ] = useState(initial?.brandName ?? "");
   const [brandId, setBrandId] = useState<string | null>(initial?.brandId ?? null);
   const [lockedBrandName, setLockedBrandName] = useState<string | null>(
@@ -102,6 +113,7 @@ export function ProductForm({
     setGenericName(initial.genericName ?? "");
     setProductCategory(initial.productCategory ?? DEFAULT_PRODUCT_CATEGORY);
     setProductType(initial.productType ?? DEFAULT_PRODUCT_TYPE);
+    setProductSchedule(initial.productSchedule ?? DEFAULT_PRODUCT_SCHEDULE);
     setBrandQ(initial.brandName ?? "");
     setBrandId(initial.brandId ?? null);
     setLockedBrandName(initial.brandId ? (initial.brandName ?? null) : null);
@@ -213,6 +225,7 @@ export function ProductForm({
         genericName: genericName.trim() || undefined,
         productCategory,
         productType,
+        productSchedule,
         brandId,
         packSize,
         reorderMin,
@@ -237,6 +250,7 @@ export function ProductForm({
         setGenericName(cleared.genericName);
         setProductCategory(cleared.productCategory);
         setProductType(cleared.productType);
+        setProductSchedule(cleared.productSchedule);
         setBrandQ("");
         setBrandId(null);
         setLockedBrandName(null);
@@ -262,147 +276,177 @@ export function ProductForm({
       {variant === "page" ? (
         <h2 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Add product (catalog)</h2>
       ) : null}
-      <div className={`flex ${variant === "modal" ? "-mx-1 flex-nowrap overflow-x-auto px-1 pb-1" : "flex-wrap"} items-end gap-3 ${variant === "page" ? "mt-3" : "mt-0"}`}>
-        <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
-          <span className={labelCls}>Name</span>
-          <input
-            required
-            placeholder="Product name"
-            className={inputCls}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus={variant === "modal"}
-          />
-        </label>
-        <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
-          <span className={labelCls}>Generic name</span>
-          <input
-            placeholder="Optional"
-            className={inputCls}
-            value={genericName}
-            onChange={(e) => setGenericName(e.target.value)}
-          />
-        </label>
-        <CatalogBrandSearchField
-          fieldId={brandFieldId}
-          labelCls={labelCls}
-          inputCls={inputCls}
-          value={brandQ}
-          onChange={onBrandInputChange}
-          hits={brandHits}
-          hi={brandHi}
-          onHiChange={setBrandHi}
-          onPick={pickBrand}
-          onDismissHits={() => setBrandHits([])}
-          listOpen={listOpen}
-          onKeyDown={onBrandKeyDown}
-        />
-        <label className="flex w-[7.5rem] flex-col gap-1">
-          <span className={labelCls}>Category</span>
-          <select
-            className={inputCls}
-            aria-label="Product category"
-            value={productCategory}
-            onChange={(e) => {
-              const next = e.target.value as ProductCategory;
-              setProductCategory(next);
-              if (next !== "JANAUSHADHI") setDrugCode("");
-            }}
-          >
-            {PRODUCT_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {PRODUCT_CATEGORY_LABELS[c]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex w-[7.5rem] flex-col gap-1">
-          <span className={labelCls}>Type</span>
-          <select
-            className={inputCls}
-            aria-label="Product type"
-            value={productType}
-            onChange={(e) => setProductType(e.target.value as ProductType)}
-          >
-            {PRODUCT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {PRODUCT_TYPE_LABELS[t]}
-              </option>
-            ))}
-          </select>
-        </label>
-        {productCategory === "JANAUSHADHI" ? (
-          <label className="flex w-[5.5rem] flex-col gap-1">
-            <span className={labelCls}>Drug code</span>
-            <input
-              required
-              placeholder="0000"
-              title="Required for Janaushadhi. Stored as JAN…; search at POS by number only (not on bills)"
-              className={`${inputCls} tabular-nums`}
-              value={drugCode}
-              onChange={(e) => setDrugCode(e.target.value)}
-              inputMode="numeric"
-              autoComplete="off"
+      {(() => {
+        const identityFields = (
+          <>
+            <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
+              <span className={labelCls}>Name</span>
+              <input
+                required
+                placeholder="Product name"
+                className={inputCls}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoFocus={variant === "modal"}
+              />
+            </label>
+            <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
+              <span className={labelCls}>Generic name</span>
+              <input
+                placeholder="Optional"
+                className={inputCls}
+                value={genericName}
+                onChange={(e) => setGenericName(e.target.value)}
+              />
+            </label>
+            <CatalogBrandSearchField
+              fieldId={brandFieldId}
+              labelCls={labelCls}
+              inputCls={inputCls}
+              value={brandQ}
+              onChange={onBrandInputChange}
+              hits={brandHits}
+              hi={brandHi}
+              onHiChange={setBrandHi}
+              onPick={pickBrand}
+              onDismissHits={() => setBrandHits([])}
+              listOpen={listOpen}
+              wrapClassName="relative flex min-w-[10rem] flex-1 flex-col gap-1"
+              onKeyDown={onBrandKeyDown}
             />
-          </label>
-        ) : null}
-        <label className="flex w-[5.25rem] flex-col gap-1">
-          <span className={labelCls}>Pack</span>
-          <input
-            type="number"
-            required
-            min={1}
-            placeholder="10"
-            title="Units per pack (e.g. 10 tablets per strip)"
-            className={`${inputCls} tabular-nums`}
-            value={packSize}
-            onChange={(e) => setPackSize(Number(e.target.value))}
-          />
-        </label>
-        <label className="flex w-[7rem] flex-col gap-1">
-          <span className={labelCls}>Reorder at qty</span>
-          <input
-            type="number"
-            min={0}
-            className={`${inputCls} tabular-nums`}
-            value={reorderMin}
-            onChange={(e) => setReorderMin(Number(e.target.value))}
-          />
-        </label>
-        <label className="flex w-[6.5rem] flex-col gap-1">
-          <span className={labelCls}>GST %</span>
-          <select
-            className={inputCls}
-            aria-label="GST percent"
-            value={gstPct}
-            onChange={(e) => setGstPct(Number(e.target.value))}
-          >
-            {PRODUCT_GST_SLABS.map((p) => (
-              <option key={p} value={p}>
-                {p}%
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="flex shrink-0 gap-2">
-          {variant === "modal" && onCancel ? (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
-            >
-              Cancel
-            </button>
-          ) : null}
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-lg bg-gradient-to-r from-brand-blue to-brand-green px-4 py-2 text-sm font-medium text-white shadow-lg shadow-brand-blue/25 hover:brightness-110 disabled:opacity-50"
-          >
-            {busy ? "Saving…" : isEdit ? "Save" : "Add product"}
-          </button>
-        </div>
-      </div>
+          </>
+        );
+        const catalogFields = (
+          <>
+            <label className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className={labelCls}>Category</span>
+              <select
+                className={inputCls}
+                aria-label="Product category"
+                value={productCategory}
+                onChange={(e) => {
+                  const next = e.target.value as ProductCategory;
+                  setProductCategory(next);
+                  if (next !== "JANAUSHADHI") setDrugCode("");
+                }}
+              >
+                {PRODUCT_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {PRODUCT_CATEGORY_LABELS[c]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className={labelCls}>Type</span>
+              <select
+                className={inputCls}
+                aria-label="Product type"
+                value={productType}
+                onChange={(e) => setProductType(e.target.value as ProductType)}
+              >
+                {PRODUCT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {PRODUCT_TYPE_LABELS[t]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className={labelCls}>Schedule</span>
+              <select
+                className={inputCls}
+                aria-label="Product schedule"
+                value={productSchedule}
+                onChange={(e) => setProductSchedule(e.target.value as ProductSchedule)}
+              >
+                {PRODUCT_SCHEDULES.map((s) => (
+                  <option key={s} value={s}>
+                    {PRODUCT_SCHEDULE_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {productCategory === "JANAUSHADHI" ? (
+              <label className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className={labelCls}>Drug code</span>
+                <input
+                  required
+                  placeholder="0000"
+                  title="Required for Janaushadhi. Stored as JAN…; search at POS by number only (not on bills)"
+                  className={`${inputCls} tabular-nums`}
+                  value={drugCode}
+                  onChange={(e) => setDrugCode(e.target.value)}
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+              </label>
+            ) : null}
+            <label className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className={labelCls}>Pack</span>
+              <input
+                type="number"
+                required
+                min={1}
+                placeholder="10"
+                title="Units per pack (e.g. 10 tablets per strip)"
+                className={`${inputCls} tabular-nums`}
+                value={packSize}
+                onChange={(e) => setPackSize(Number(e.target.value))}
+              />
+            </label>
+            <label className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className={labelCls}>Reorder at qty</span>
+              <input
+                type="number"
+                min={0}
+                className={`${inputCls} tabular-nums`}
+                value={reorderMin}
+                onChange={(e) => setReorderMin(Number(e.target.value))}
+              />
+            </label>
+            <label className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className={labelCls}>GST %</span>
+              <select
+                className={inputCls}
+                aria-label="GST percent"
+                value={gstPct}
+                onChange={(e) => setGstPct(Number(e.target.value))}
+              >
+                {PRODUCT_GST_SLABS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}%
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        );
+        return (
+          <div className={`flex flex-col gap-3 ${variant === "page" ? "mt-3" : ""}`}>
+            <div className="flex w-full flex-wrap items-end gap-3">{identityFields}</div>
+            <div className="flex w-full flex-nowrap items-end gap-3">{catalogFields}</div>
+            <div className="flex justify-end gap-2">
+              {variant === "modal" && onCancel ? (
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+              ) : null}
+              <button
+                type="submit"
+                disabled={busy}
+                className="rounded-lg bg-gradient-to-r from-brand-blue to-brand-green px-4 py-2 text-sm font-medium text-white shadow-lg shadow-brand-blue/25 hover:brightness-110 disabled:opacity-50"
+              >
+                {busy ? "Saving…" : isEdit ? "Save" : "Add product"}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
       {err ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{err}</p> : null}
     </form>
   );
@@ -417,6 +461,7 @@ export function productRowToFormValues(row: {
   genericName: string | null;
   productCategory: string | null;
   productType: string | null;
+  productSchedule: string | null;
   packSize: number;
   reorderMin: number;
   gstPct: number;
@@ -436,6 +481,10 @@ export function productRowToFormValues(row: {
       row.productType && PRODUCT_TYPES.includes(row.productType as ProductType)
         ? (row.productType as ProductType)
         : DEFAULT_PRODUCT_TYPE,
+    productSchedule:
+      row.productSchedule && PRODUCT_SCHEDULES.includes(row.productSchedule as ProductSchedule)
+        ? (row.productSchedule as ProductSchedule)
+        : DEFAULT_PRODUCT_SCHEDULE,
     packSize: row.packSize,
     reorderMin: row.reorderMin,
     gstPct: row.gstPct,

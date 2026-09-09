@@ -1,0 +1,12 @@
+---
+description: Mirror medseb and reimed changes
+alwaysApply: true
+---
+
+# Mirror medseb and reimed
+
+`medseb` and `reimed` are sister apps. When you change one, apply the same change to the other unless the user says otherwise.
+
+- Paths usually match (`src/...`, `prisma/...`).
+- Adapt only if a file or feature exists in one repo and not the other.
+- Do this in the same turn, not as a follow-up.

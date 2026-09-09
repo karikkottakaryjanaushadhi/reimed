@@ -5,6 +5,7 @@ import { gstPctNumber } from "@/lib/product-gst-slabs";
 import { displayDrugCode } from "@/lib/drug-code";
 import { productCategoryLabel } from "@/lib/product-categories";
 import { productTypeLabel } from "@/lib/product-types";
+import { productScheduleLabel } from "@/lib/product-schedules";
 import type { ProductListRow } from "./products-table";
 
 function stockCellClass(stockQty: number, reorderMin: number): string {
@@ -70,6 +71,14 @@ export function ProductsListMobile({
               <div>
                 <dt className="text-xs text-zinc-500">Type</dt>
                 <dd>{productTypeLabel(p.productType)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-zinc-500">Schedule</dt>
+                <dd>
+                  {p.productSchedule && p.productSchedule !== "NONE"
+                    ? productScheduleLabel(p.productSchedule)
+                    : "—"}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs text-zinc-500">Pack</dt>

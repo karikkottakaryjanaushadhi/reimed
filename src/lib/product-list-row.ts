@@ -5,6 +5,7 @@ export type ProductListRow = {
   genericName: string | null;
   productCategory: string | null;
   productType: string | null;
+  productSchedule: string | null;
   brandId: string | null;
   brandName: string | null;
   packSize: number;

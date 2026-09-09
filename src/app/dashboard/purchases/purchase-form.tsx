@@ -44,6 +44,7 @@ import {
 } from "@/lib/purchase-paid";
 import type { ProductCategory } from "@/lib/product-categories";
 import type { ProductType } from "@/lib/product-types";
+import type { ProductSchedule } from "@/lib/product-schedules";
 import { snapProductGstPct } from "@/lib/product-gst-slabs";
 import {
   PurchaseNewProductModal,
@@ -152,6 +153,7 @@ type Line = {
   catalogProductCategory?: ProductCategory;
   /** Type stored on Product for lines created as newProduct */
   catalogProductType?: ProductType;
+  catalogProductSchedule?: ProductSchedule;
   /** Drug code stored on Product.sku for lines created as newProduct */
   catalogDrugCode?: string;
   genericName?: string;
@@ -906,6 +908,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
         gstPct: row.catalogGstPct ?? row.gstPct ?? 5,
         productCategory: row.catalogProductCategory,
         productType: row.catalogProductType,
+        productSchedule: row.catalogProductSchedule,
         brandId: row.catalogBrandId ?? null,
         brandName: row.manufacturer ?? "",
         drugCode: row.catalogDrugCode ?? "",
@@ -920,6 +923,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
         gstPct: draft.catalogGstPct ?? 5,
         productCategory: draft.catalogProductCategory,
         productType: draft.catalogProductType,
+        productSchedule: draft.catalogProductSchedule,
         brandId: draft.catalogBrandId ?? null,
         brandName: draft.manufacturer ?? "",
         drugCode: draft.catalogDrugCode ?? "",
@@ -953,6 +957,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
             catalogGstPct: v.gstPct,
             catalogProductCategory: v.productCategory,
             catalogProductType: v.productType,
+            catalogProductSchedule: v.productSchedule,
             catalogDrugCode:
               v.productCategory === "JANAUSHADHI" && v.drugCode.trim()
                 ? v.drugCode.trim()
@@ -976,6 +981,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
         catalogGstPct: v.gstPct,
         catalogProductCategory: v.productCategory,
         catalogProductType: v.productType,
+        catalogProductSchedule: v.productSchedule,
         catalogDrugCode:
           v.productCategory === "JANAUSHADHI" && v.drugCode.trim() ? v.drugCode.trim() : undefined,
         pack: v.packSize,
@@ -1151,6 +1157,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
           gstPct: number;
           productCategory?: ProductCategory;
           productType?: ProductType;
+          productSchedule?: ProductSchedule;
         } = {
           name: l.labelName,
           packSize: Math.max(1, Math.trunc(l.pack) || 1),
@@ -1158,6 +1165,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
           gstPct: l.catalogGstPct ?? 5,
           productCategory: l.catalogProductCategory,
           productType: l.catalogProductType,
+          productSchedule: l.catalogProductSchedule,
         };
         const bid = l.catalogBrandId?.trim();
         if (bid) {

@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { isProductGstSlab, snapProductGstPct } from "@/lib/product-gst-slabs";
 import { isProductCategory } from "@/lib/product-categories";
 import { isProductType } from "@/lib/product-types";
+import { isProductSchedule } from "@/lib/product-schedules";
 import { normalizeInventoryLotExpiryDate } from "@/lib/inventory-lot-expiry";
 import { lotSalePricingFromPurchaseLine } from "@/lib/inventory-lot-pricing";
 import { upsertInventoryLotStockFromPurchase } from "@/lib/inventory-lot-upsert";
@@ -36,6 +37,10 @@ const newProductSchema = z.object({
   productType: z
     .string()
     .refine((v) => isProductType(v), { message: "Invalid product type" })
+    .optional(),
+  productSchedule: z
+    .string()
+    .refine((v) => isProductSchedule(v), { message: "Invalid product schedule" })
     .optional(),
   gstPct: z.number().refine((n) => isProductGstSlab(n), { message: "GST % must be 0, 5, 18, or 40" }).optional(),
   drugCode: z.string().optional(),
@@ -142,6 +147,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                 reorderMin: np.reorderMin ?? 0,
                 ...(np.productCategory !== undefined ? { productCategory: np.productCategory } : {}),
                 ...(np.productType !== undefined ? { productType: np.productType } : {}),
+                ...(np.productSchedule !== undefined ? { productSchedule: np.productSchedule } : {}),
                 ...(np.gstPct !== undefined ? { gstPct: np.gstPct } : {}),
               },
             });

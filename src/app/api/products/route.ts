@@ -8,6 +8,7 @@ import { compactSearchKey, sortByProductSearchRelevance } from "@/lib/search-nor
 import { isProductGstSlab } from "@/lib/product-gst-slabs";
 import { isProductCategory } from "@/lib/product-categories";
 import { isProductType } from "@/lib/product-types";
+import { isProductSchedule } from "@/lib/product-schedules";
 import { storeUpper, storeUpperNull, storeUpperOpt } from "@/lib/store-text";
 
 export async function GET(req: Request) {
@@ -29,6 +30,7 @@ export async function GET(req: Request) {
         genericName: true,
         productCategory: true,
         productType: true,
+        productSchedule: true,
         packSize: true,
         gstPct: true,
         reorderMin: true,
@@ -74,6 +76,7 @@ export async function GET(req: Request) {
       genericName: true,
       productCategory: true,
       productType: true,
+      productSchedule: true,
       packSize: true,
       gstPct: true,
       reorderMin: true,
@@ -106,6 +109,10 @@ const createSchema = z.object({
   productType: z
     .string()
     .refine((v) => isProductType(v), { message: "Invalid product type" })
+    .optional(),
+  productSchedule: z
+    .string()
+    .refine((v) => isProductSchedule(v), { message: "Invalid product schedule" })
     .optional(),
   gstPct: z
     .number()
@@ -176,6 +183,9 @@ export async function POST(req: Request) {
             : {}),
           ...(parsed.data.productType !== undefined
             ? { productType: parsed.data.productType }
+            : {}),
+          ...(parsed.data.productSchedule !== undefined
+            ? { productSchedule: parsed.data.productSchedule }
             : {}),
           ...(parsed.data.gstPct !== undefined ? { gstPct: parsed.data.gstPct } : {}),
         },

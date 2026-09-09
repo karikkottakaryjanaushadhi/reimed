@@ -5,6 +5,7 @@ import { displayDrugCode } from "@/lib/drug-code";
 import { formatAppDateYmd } from "@/lib/app-timezone";
 import { productCategoryLabel } from "@/lib/product-categories";
 import { productTypeLabel } from "@/lib/product-types";
+import { productScheduleLabel } from "@/lib/product-schedules";
 import { parseProductStockFilter, queryProductList } from "@/lib/products-list-query";
 
 export async function GET(req: Request) {
@@ -31,6 +32,7 @@ export async function GET(req: Request) {
       "Generic",
       "Category",
       "Type",
+      "Schedule",
       "Supplier",
       "Stock",
       "Pack",
@@ -44,6 +46,9 @@ export async function GET(req: Request) {
       row.genericName ?? "",
       productCategoryLabel(row.productCategory),
       productTypeLabel(row.productType),
+      row.productSchedule && row.productSchedule !== "NONE"
+        ? productScheduleLabel(row.productSchedule)
+        : "",
       row.suppliers ?? "",
       row.stockQty,
       row.packSize,

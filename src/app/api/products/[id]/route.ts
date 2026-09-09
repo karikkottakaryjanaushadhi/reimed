@@ -13,6 +13,7 @@ import { storeUpper, storeUpperNull } from "@/lib/store-text";
 import { isProductGstSlab } from "@/lib/product-gst-slabs";
 import { isProductCategory } from "@/lib/product-categories";
 import { isProductType } from "@/lib/product-types";
+import { isProductSchedule } from "@/lib/product-schedules";
 
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
@@ -29,6 +30,10 @@ const patchSchema = z.object({
   productType: z
     .string()
     .refine((v) => isProductType(v), { message: "Invalid product type" })
+    .optional(),
+  productSchedule: z
+    .string()
+    .refine((v) => isProductSchedule(v), { message: "Invalid product schedule" })
     .optional(),
   gstPct: z
     .number()
@@ -83,6 +88,9 @@ export async function PATCH(
         : {}),
       ...(parsed.data.productType !== undefined
         ? { productType: parsed.data.productType }
+        : {}),
+      ...(parsed.data.productSchedule !== undefined
+        ? { productSchedule: parsed.data.productSchedule }
         : {}),
       ...(parsed.data.gstPct !== undefined ? { gstPct: parsed.data.gstPct } : {}),
     },

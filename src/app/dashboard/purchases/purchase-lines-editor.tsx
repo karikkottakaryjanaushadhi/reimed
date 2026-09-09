@@ -19,6 +19,7 @@ import { NumericTableInput } from "@/components/numeric-table-input";
 import { anchorRectBelow, floatingDropdownMaxHeight } from "@/lib/floating-dropdown";
 import { DEFAULT_PRODUCT_CATEGORY, type ProductCategory } from "@/lib/product-categories";
 import { DEFAULT_PRODUCT_TYPE, type ProductType } from "@/lib/product-types";
+import { DEFAULT_PRODUCT_SCHEDULE, type ProductSchedule } from "@/lib/product-schedules";
 import { snapProductGstPct } from "@/lib/product-gst-slabs";
 import { navigatePurchaseTable } from "@/lib/purchase-table-nav";
 import {
@@ -86,6 +87,7 @@ export type PurchaseLineDraft = {
   catalogGstPct?: number;
   catalogProductCategory?: ProductCategory;
   catalogProductType?: ProductType;
+  catalogProductSchedule?: ProductSchedule;
   catalogDrugCode?: string;
   manufacturer?: string;
   genericName?: string;
@@ -228,6 +230,8 @@ export const PurchaseLinesEditor = forwardRef<
     useState<ProductCategory>(DEFAULT_PRODUCT_CATEGORY);
   const [addCatalogProductType, setAddCatalogProductType] =
     useState<ProductType>(DEFAULT_PRODUCT_TYPE);
+  const [addCatalogProductSchedule, setAddCatalogProductSchedule] =
+    useState<ProductSchedule>(DEFAULT_PRODUCT_SCHEDULE);
   const [newProductModalOpen, setNewProductModalOpen] = useState(false);
   const [newProductModalInitial, setNewProductModalInitial] =
     useState<PurchaseNewProductModalInitial | null>(null);
@@ -262,6 +266,7 @@ export const PurchaseLinesEditor = forwardRef<
     setAddCatalogGstPct(5);
     setAddCatalogProductCategory(DEFAULT_PRODUCT_CATEGORY);
     setAddCatalogProductType(DEFAULT_PRODUCT_TYPE);
+    setAddCatalogProductSchedule(DEFAULT_PRODUCT_SCHEDULE);
   }
 
   function focusAddRowNameSearch() {
@@ -291,6 +296,7 @@ export const PurchaseLinesEditor = forwardRef<
         gstPct: addCatalogGstPct,
         productCategory: addCatalogProductCategory,
         productType: addCatalogProductType,
+        productSchedule: addCatalogProductSchedule,
         brandId: addCatalogBrandId,
         brandName: addManufacturer,
         drugCode: addDraft.catalogDrugCode ?? "",
@@ -320,6 +326,7 @@ export const PurchaseLinesEditor = forwardRef<
       catalogGstPct: v.gstPct,
       catalogProductCategory: v.productCategory,
       catalogProductType: v.productType,
+      catalogProductSchedule: v.productSchedule,
       catalogDrugCode:
         v.productCategory === "JANAUSHADHI" && v.drugCode.trim() ? v.drugCode.trim() : undefined,
     });
@@ -329,6 +336,7 @@ export const PurchaseLinesEditor = forwardRef<
     setAddCatalogGstPct(v.gstPct);
     setAddCatalogProductCategory(v.productCategory);
     setAddCatalogProductType(v.productType);
+    setAddCatalogProductSchedule(v.productSchedule);
     setAddSearchQ("");
     setAddHits([]);
     setAddHitHi(-1);
@@ -600,6 +608,7 @@ export const PurchaseLinesEditor = forwardRef<
                   gstPct: row.catalogGstPct ?? row.gstPct ?? 5,
                   productCategory: row.catalogProductCategory,
                   productType: row.catalogProductType,
+                  productSchedule: row.catalogProductSchedule,
                   ...(row.genericName?.trim() ? { genericName: row.genericName.trim() } : {}),
                   ...(row.catalogProductCategory === "JANAUSHADHI" && row.catalogDrugCode?.trim()
                     ? { drugCode: row.catalogDrugCode.trim() }

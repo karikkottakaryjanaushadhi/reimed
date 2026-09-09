@@ -107,6 +107,8 @@ model Product {
   productCategory String     @default("GENERIC")
   /// CAPSULES | CREAMS | … | TABLETS | EQUIPMENT
   productType String         @default("TABLETS")
+  /// NONE | G | H | H1 | X | C | C1 | K | J | M | N | P
+  productSchedule String     @default("NONE")
   packSize    Int            @default(1) // units per strip/pack; billing column
   unit        String         @default("unit")
   hsn         String?

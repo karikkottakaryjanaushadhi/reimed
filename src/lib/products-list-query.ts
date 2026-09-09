@@ -145,6 +145,7 @@ function mapProductListRows(
     genericName: p.genericName,
     productCategory: p.productCategory,
     productType: p.productType,
+    productSchedule: p.productSchedule,
     brandId: p.brandId,
     brandName: p.brandName,
     packSize: Number(p.packSize) || 1,
@@ -201,6 +202,7 @@ export async function queryProductList(
              p."genericName" AS "genericName",
              p."productCategory" AS "productCategory",
              p."productType" AS "productType",
+             p."productSchedule" AS "productSchedule",
              p."brandId" AS "brandId",
              p."packSize" AS "packSize",
              p."reorderMin" AS "reorderMin",
@@ -213,7 +215,7 @@ export async function queryProductList(
       LEFT JOIN "InventoryLot" il ON il."productId" = p."id"
       LEFT JOIN "Supplier" s ON s."id" = il."supplierId"
       WHERE ${whereSql}
-      GROUP BY p."id", p."sku", p."name", p."genericName", p."productCategory", p."productType", p."brandId", p."packSize", p."reorderMin", p."gstPct", b."name"
+      GROUP BY p."id", p."sku", p."name", p."genericName", p."productCategory", p."productType", p."productSchedule", p."brandId", p."packSize", p."reorderMin", p."gstPct", b."name"
       ${havingSql}
       ORDER BY ${productSortOrder(sort, dir, storeId)}
       ${pagingSql}

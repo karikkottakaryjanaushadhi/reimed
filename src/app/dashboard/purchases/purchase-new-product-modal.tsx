@@ -16,6 +16,12 @@ import {
   PRODUCT_TYPE_LABELS,
   type ProductType,
 } from "@/lib/product-types";
+import {
+  DEFAULT_PRODUCT_SCHEDULE,
+  PRODUCT_SCHEDULES,
+  PRODUCT_SCHEDULE_LABELS,
+  type ProductSchedule,
+} from "@/lib/product-schedules";
 import { compactSearchKey } from "@/lib/search-normalize";
 import { JANAUSHADHI_DRUG_CODE_REQUIRED_ERROR } from "@/lib/drug-code";
 import { CatalogBrandSearchField } from "../products/catalog-brand-search-field";
@@ -31,6 +37,7 @@ const NP_MODAL_FIELD_IDS = [
   "brand",
   "category",
   "type",
+  "schedule",
   "drugCode",
   "pack",
   "reorderMin",
@@ -40,7 +47,7 @@ const NP_MODAL_FIELD_IDS = [
 type NpModalField = (typeof NP_MODAL_FIELD_IDS)[number];
 
 function npModalFields(category: ProductCategory): NpModalField[] {
-  const fields: NpModalField[] = ["name", "genericName", "brand", "category", "type"];
+  const fields: NpModalField[] = ["name", "genericName", "brand", "category", "type", "schedule"];
   if (category === "JANAUSHADHI") fields.push("drugCode");
   fields.push("pack", "reorderMin", "gstPct", "apply");
   return fields;
@@ -74,6 +81,7 @@ export type PurchaseNewProductModalResult = {
   brandName: string;
   productCategory: ProductCategory;
   productType: ProductType;
+  productSchedule: ProductSchedule;
   packSize: number;
   reorderMin: number;
   gstPct: number;
@@ -109,6 +117,7 @@ export function PurchaseNewProductModal({
   const [packSize, setPackSize] = useState(10);
   const [productCategory, setProductCategory] = useState<ProductCategory>(DEFAULT_PRODUCT_CATEGORY);
   const [productType, setProductType] = useState<ProductType>(DEFAULT_PRODUCT_TYPE);
+  const [productSchedule, setProductSchedule] = useState<ProductSchedule>(DEFAULT_PRODUCT_SCHEDULE);
   const [reorderMin, setReorderMin] = useState(0);
   const [gstPct, setGstPct] = useState(5);
 
@@ -126,6 +135,7 @@ export function PurchaseNewProductModal({
     setPackSize(Math.max(1, initial?.packSize ?? 10));
     setProductCategory(initial?.productCategory ?? DEFAULT_PRODUCT_CATEGORY);
     setProductType(initial?.productType ?? DEFAULT_PRODUCT_TYPE);
+    setProductSchedule(initial?.productSchedule ?? DEFAULT_PRODUCT_SCHEDULE);
     setReorderMin(Math.max(0, initial?.reorderMin ?? 0));
     setGstPct(initial?.gstPct ?? 5);
   }, [open, initial]);
@@ -272,6 +282,7 @@ export function PurchaseNewProductModal({
       brandName: brandId ? (lockedBrandName ?? brandQ).trim() : brandQ.trim(),
       productCategory,
       productType,
+      productSchedule,
       packSize: Math.max(1, Math.floor(Number(packSize)) || 1),
       reorderMin: Math.max(0, Math.floor(Number(reorderMin)) || 0),
       gstPct: Number(gstPct),
@@ -299,7 +310,8 @@ export function PurchaseNewProductModal({
         <p className="mt-1 text-xs text-zinc-500">
           Same fields as Add product on the Products page. Pack updates this line&apos;s Pack column.
         </p>
-        <div className="mt-3 grid grid-cols-2 gap-3 md:-mx-1 md:flex md:flex-nowrap md:items-end md:gap-3 md:overflow-x-auto md:px-1 md:pb-1">
+        <div className="mt-3 flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-3 md:flex md:flex-nowrap md:items-end">
           <label className="col-span-2 flex min-w-0 flex-col gap-1 md:min-w-[10rem] md:flex-1">
             <span className={catalogLabelCls}>Name</span>
             <input
@@ -338,10 +350,12 @@ export function PurchaseNewProductModal({
             onPick={pickBrand}
             onDismissHits={() => setBrandHits([])}
             listOpen={brandListOpen}
-            wrapClassName="relative col-span-2 flex min-w-0 w-full flex-col gap-1 md:min-w-[10rem] md:max-w-[20rem] md:flex-1"
+            wrapClassName="relative col-span-2 flex min-w-0 w-full flex-col gap-1 md:min-w-[10rem] md:max-w-none md:flex-1"
             inputProps={{ "data-np-field": "brand", onKeyDown: onBrandKeyDown }}
           />
-          <label className="flex min-w-0 flex-col gap-1 md:w-[7.5rem]">
+        </div>
+        <div className="grid w-full grid-cols-2 gap-3 md:flex md:flex-nowrap md:items-end">
+          <label className="flex min-w-0 flex-col gap-1 md:flex-1">
             <span className={catalogLabelCls}>Category</span>
             <select
               className={catalogInputCls}
@@ -362,7 +376,7 @@ export function PurchaseNewProductModal({
               ))}
             </select>
           </label>
-          <label className="flex min-w-0 flex-col gap-1 md:w-[7.5rem]">
+          <label className="flex min-w-0 flex-col gap-1 md:flex-1">
             <span className={catalogLabelCls}>Type</span>
             <select
               className={catalogInputCls}
@@ -379,8 +393,25 @@ export function PurchaseNewProductModal({
               ))}
             </select>
           </label>
+          <label className="flex min-w-0 flex-col gap-1 md:flex-1">
+            <span className={catalogLabelCls}>Schedule</span>
+            <select
+              className={catalogInputCls}
+              aria-label="Product schedule"
+              value={productSchedule}
+              onChange={(e) => setProductSchedule(e.target.value as ProductSchedule)}
+              onKeyDown={(e) => onNpFieldEnter(e, "schedule")}
+              data-np-field="schedule"
+            >
+              {PRODUCT_SCHEDULES.map((s) => (
+                <option key={s} value={s}>
+                  {PRODUCT_SCHEDULE_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </label>
           {productCategory === "JANAUSHADHI" ? (
-            <label className="flex min-w-0 flex-col gap-1 md:w-[5.5rem]">
+            <label className="flex min-w-0 flex-col gap-1 md:flex-1">
               <span className={catalogLabelCls}>Drug code</span>
               <input
                 required
@@ -396,7 +427,7 @@ export function PurchaseNewProductModal({
               />
             </label>
           ) : null}
-          <label className="flex min-w-0 flex-col gap-1 md:w-[5.25rem]">
+          <label className="flex min-w-0 flex-col gap-1 md:flex-1">
             <span className={catalogLabelCls}>Pack</span>
             <input
               type="number"
@@ -412,7 +443,7 @@ export function PurchaseNewProductModal({
               data-np-field="pack"
             />
           </label>
-          <label className="flex min-w-0 flex-col gap-1 md:w-[7rem]">
+          <label className="flex min-w-0 flex-col gap-1 md:flex-1">
             <span className={catalogLabelCls}>Reorder at qty</span>
             <input
               type="number"
@@ -425,7 +456,7 @@ export function PurchaseNewProductModal({
             />
           </label>
           <label
-            className={`flex min-w-0 flex-col gap-1 md:w-[6.5rem] ${
+            className={`flex min-w-0 flex-col gap-1 md:flex-1 ${
               productCategory === "JANAUSHADHI" ? "col-span-2" : ""
             }`}
           >
@@ -445,6 +476,7 @@ export function PurchaseNewProductModal({
               ))}
             </select>
           </label>
+        </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <button

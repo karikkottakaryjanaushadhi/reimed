@@ -7,6 +7,7 @@ import { buildSimpleListUrl } from "@/lib/list-pagination";
 import { gstPctNumber } from "@/lib/product-gst-slabs";
 import { productCategoryLabel } from "@/lib/product-categories";
 import { productTypeLabel } from "@/lib/product-types";
+import { productScheduleLabel } from "@/lib/product-schedules";
 import { displayDrugCode } from "@/lib/drug-code";
 import type { ProductListRow } from "@/lib/product-list-row";
 import { ProductForm, productRowToFormValues } from "./product-form";
@@ -154,6 +155,7 @@ export function ProductsTable({
               </th>
               <th className="px-4 py-3">Category</th>
               <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">Schedule</th>
               <th className="min-w-[8rem] px-4 py-3">Supplier</th>
               <th className="px-4 py-3 text-right">
                 <Link href={sortHref("stock")} className="inline-flex items-center gap-1 font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
@@ -198,6 +200,11 @@ export function ProductsTable({
                   </td>
                   <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">
                     {productTypeLabel(p.productType)}
+                  </td>
+                  <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">
+                    {p.productSchedule && p.productSchedule !== "NONE"
+                      ? productScheduleLabel(p.productSchedule)
+                      : "—"}
                   </td>
                   <td className="max-w-[12rem] truncate px-4 py-2 text-zinc-600 dark:text-zinc-400" title={p.suppliers ?? undefined}>
                     {p.suppliers ?? "—"}
