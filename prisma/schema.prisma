@@ -124,6 +124,9 @@ model Product {
   @@index([brandId])
   @@index([name])
   @@index([genericName])
+  @@index([productCategory])
+  @@index([productType])
+  @@index([productSchedule])
 }
 
 model InventoryLot {
@@ -198,7 +201,9 @@ model Purchase {
   @@index([storeId, invoiceDate])
   @@index([storeId, complete])
   @@index([storeId, paid])
+  @@index([storeId, paymentMode])
   @@index([supplierId])
+  @@index([createdById])
 }
 
 model PurchaseLine {
@@ -286,6 +291,9 @@ model Sale {
 
   @@unique([storeId, billNo])
   @@index([storeId, createdAt])
+  @@index([storeId, paid])
+  @@index([storeId, paymentMode])
+  @@index([createdById])
 }
 
 model SaleLine {

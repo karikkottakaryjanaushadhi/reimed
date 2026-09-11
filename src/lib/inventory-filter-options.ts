@@ -35,6 +35,23 @@ export function parseInventoryLotQtyFilter(raw: unknown): InventoryLotQtyFilter 
 
 type InventoryFilterExclude = "supplier" | "brand";
 
+function productAttrIdInClause(params: InventoryFilterParams, exclude?: InventoryFilterExclude) {
+  const parts: Prisma.Sql[] = [];
+  if (exclude !== "brand" && params.brandId?.trim()) {
+    parts.push(Prisma.sql`p2."brandId" = ${params.brandId.trim()}`);
+  }
+  const category = parseProductCategoryFilter(params.category);
+  if (category) parts.push(Prisma.sql`p2."productCategory" = ${category}`);
+  const type = parseProductTypeFilter(params.type);
+  if (type) parts.push(Prisma.sql`p2."productType" = ${type}`);
+  const schedule = parseProductScheduleFilter(params.schedule);
+  if (schedule) parts.push(Prisma.sql`p2."productSchedule" = ${schedule}`);
+  if (parts.length === 0) return Prisma.sql``;
+  return Prisma.sql`AND il."productId" IN (
+    SELECT p2."id" FROM "Product" p2 WHERE ${Prisma.join(parts, " AND ")}
+  )`;
+}
+
 function buildInventoryLotClauses(params: InventoryFilterParams, exclude?: InventoryFilterExclude) {
   const storeId = params.storeId;
   const search = parseInventorySearch(params.q ?? "");
@@ -45,19 +62,7 @@ function buildInventoryLotClauses(params: InventoryFilterParams, exclude?: Inven
       ? Prisma.sql`AND il."supplierId" = ${params.supplierId.trim()}`
       : Prisma.sql``;
 
-  const brandClause =
-    exclude !== "brand" && params.brandId?.trim()
-      ? Prisma.sql`AND p."brandId" = ${params.brandId.trim()}`
-      : Prisma.sql``;
-
-  const category = parseProductCategoryFilter(params.category);
-  const categoryClause = category ? Prisma.sql`AND p."productCategory" = ${category}` : Prisma.sql``;
-
-  const type = parseProductTypeFilter(params.type);
-  const typeClause = type ? Prisma.sql`AND p."productType" = ${type}` : Prisma.sql``;
-
-  const schedule = parseProductScheduleFilter(params.schedule);
-  const scheduleClause = schedule ? Prisma.sql`AND p."productSchedule" = ${schedule}` : Prisma.sql``;
+  const productAttrClause = productAttrIdInClause(params, exclude);
 
   const qty = parseInventoryLotQtyFilter(params.qty);
   const qtyClause =
@@ -72,7 +77,7 @@ function buildInventoryLotClauses(params: InventoryFilterParams, exclude?: Inven
 
   const lowStockSubquery = params.lowStock
     ? Prisma.sql`
-        AND p."id" IN (
+        AND il."productId" IN (
           SELECT p2."id"
           FROM "InventoryLot" il2
           INNER JOIN "Product" p2 ON p2."id" = il2."productId"
@@ -87,10 +92,7 @@ function buildInventoryLotClauses(params: InventoryFilterParams, exclude?: Inven
     storeId,
     searchClause,
     supplierClause,
-    brandClause,
-    categoryClause,
-    typeClause,
-    scheduleClause,
+    productAttrClause,
     qtyClause,
     expiryClause,
     lowStockSubquery,
@@ -141,41 +143,44 @@ export async function getInventoryFilterOptions(params: InventoryFilterParams) {
       const supplierClauses = buildInventoryLotClauses(params, "supplier");
       const brandClauses = buildInventoryLotClauses(params, "brand");
 
-      const extra = (c: ReturnType<typeof buildInventoryLotClauses>) => Prisma.sql`
-        ${c.categoryClause}
-        ${c.typeClause}
-        ${c.scheduleClause}
+      const lotWhere = (c: ReturnType<typeof buildInventoryLotClauses>) => Prisma.sql`
+        ${c.searchClause}
+        ${c.supplierClause}
+        ${c.productAttrClause}
+        ${c.expiryClause}
+        ${c.lowStockSubquery}
         ${c.qtyClause}
       `;
 
       const [supplierRows, brandRows] = await Promise.all([
         prisma.$queryRaw<Array<{ id: string; name: string }>>(
           Prisma.sql`
-        SELECT DISTINCT s."id" AS "id", s."name" AS "name"
-        FROM "InventoryLot" il
-        INNER JOIN "Product" p ON p."id" = il."productId"
-        INNER JOIN "Supplier" s ON s."id" = il."supplierId"
-        WHERE il."storeId" = ${supplierClauses.storeId} AND il."quantity" >= 0
-        ${supplierClauses.searchClause}
-        ${supplierClauses.brandClause}
-        ${supplierClauses.expiryClause}
-        ${supplierClauses.lowStockSubquery}
-        ${extra(supplierClauses)}
+        SELECT s."id" AS "id", s."name" AS "name"
+        FROM "Supplier" s
+        WHERE s."id" IN (
+          SELECT DISTINCT il."supplierId"
+          FROM "InventoryLot" il
+          WHERE il."storeId" = ${supplierClauses.storeId}
+            AND il."supplierId" IS NOT NULL
+            AND il."quantity" >= 0
+            ${lotWhere(supplierClauses)}
+        )
         ORDER BY s."name" ASC
           `,
         ),
         prisma.$queryRaw<Array<{ id: string; name: string }>>(
           Prisma.sql`
-        SELECT DISTINCT b."id" AS "id", b."name" AS "name"
-        FROM "InventoryLot" il
-        INNER JOIN "Product" p ON p."id" = il."productId"
-        INNER JOIN "Brand" b ON b."id" = p."brandId"
-        WHERE il."storeId" = ${brandClauses.storeId} AND il."quantity" >= 0
-        ${brandClauses.searchClause}
-        ${brandClauses.supplierClause}
-        ${brandClauses.expiryClause}
-        ${brandClauses.lowStockSubquery}
-        ${extra(brandClauses)}
+        SELECT b."id" AS "id", b."name" AS "name"
+        FROM "Brand" b
+        WHERE b."id" IN (
+          SELECT DISTINCT p."brandId"
+          FROM "InventoryLot" il
+          INNER JOIN "Product" p ON p."id" = il."productId"
+          WHERE il."storeId" = ${brandClauses.storeId}
+            AND p."brandId" IS NOT NULL
+            AND il."quantity" >= 0
+            ${lotWhere(brandClauses)}
+        )
         ORDER BY b."name" ASC
           `,
         ),

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { DisableNumberInputWheel } from "@/components/disable-number-input-wheel";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,7 +34,10 @@ export default function RootLayout({
       lang="en"
       className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-black text-zinc-50">{children}</body>
+      <body className="min-h-full flex flex-col bg-black text-zinc-50">
+        <DisableNumberInputWheel />
+        {children}
+      </body>
     </html>
   );
 }

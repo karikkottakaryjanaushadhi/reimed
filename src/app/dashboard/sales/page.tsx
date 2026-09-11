@@ -21,7 +21,12 @@ import {
   roundMoney,
 } from "@/lib/sale-return-aggregates";
 import { prisma } from "@/lib/prisma";
-import { buildSalesFilterWhere, getSalesFilterOptions } from "@/lib/sales-filter-options";
+import {
+  parseProductCategoryFilter,
+  parseProductScheduleFilter,
+  parseProductTypeFilter,
+} from "@/lib/products-filter-options";
+import { buildSalesFilterWhere, getSalesFilterOptions, parseSalePaymentModeFilter } from "@/lib/sales-filter-options";
 
 function salesExtras(
   from: string,
@@ -30,7 +35,13 @@ function salesExtras(
   billNo: string,
   doctor: string,
   patient: string,
+  cashier: string,
   product: string,
+  brand: string,
+  category: string,
+  type: string,
+  schedule: string,
+  payment: string,
   unpaidOnly: boolean,
   sort: string,
   dir: string,
@@ -41,7 +52,13 @@ function salesExtras(
   if (billNo) e.billNo = billNo;
   if (doctor) e.doctor = doctor;
   if (patient) e.patient = patient;
+  if (cashier) e.cashier = cashier;
   if (product) e.product = product;
+  if (brand) e.brand = brand;
+  if (category) e.category = category;
+  if (type) e.type = type;
+  if (schedule) e.schedule = schedule;
+  if (payment) e.payment = payment;
   if (unpaidOnly) e.unpaid = "1";
   if (pageSize !== DEFAULT_LIST_PAGE_SIZE) e.limit = String(pageSize);
   if (sort && sort !== "createdAt") e.sort = sort;
@@ -78,7 +95,13 @@ export default async function SalesPage({
     billNo?: string;
     doctor?: string;
     patient?: string;
+    cashier?: string;
     product?: string;
+    brand?: string;
+    category?: string;
+    type?: string;
+    schedule?: string;
+    payment?: string;
     unpaid?: string;
     sort?: string;
     dir?: string;
@@ -96,7 +119,13 @@ export default async function SalesPage({
   const billNo = typeof sp.billNo === "string" ? sp.billNo.trim() : "";
   const doctor = typeof sp.doctor === "string" ? sp.doctor.trim() : "";
   const patient = typeof sp.patient === "string" ? sp.patient.trim() : "";
+  const cashier = typeof sp.cashier === "string" ? sp.cashier.trim() : "";
   const product = typeof sp.product === "string" ? sp.product.trim() : "";
+  const brand = typeof sp.brand === "string" ? sp.brand.trim() : "";
+  const category = parseProductCategoryFilter(sp.category);
+  const type = parseProductTypeFilter(sp.type);
+  const schedule = parseProductScheduleFilter(sp.schedule);
+  const payment = parseSalePaymentModeFilter(sp.payment);
   const unpaidOnly = sp.unpaid === "1" || sp.unpaid === "true";
   const sort =
     sp.sort === "billNo" ||
@@ -118,7 +147,13 @@ export default async function SalesPage({
     billNo,
     doctor,
     patient,
+    cashier,
     product,
+    brand,
+    category,
+    type,
+    schedule,
+    payment,
     unpaid: unpaidOnly,
   };
 
@@ -182,7 +217,13 @@ export default async function SalesPage({
     ...(billNo ? { billNo } : {}),
     ...(doctor ? { doctor } : {}),
     ...(patient ? { patient } : {}),
+    ...(cashier ? { cashier } : {}),
     ...(product ? { product } : {}),
+    ...(brand ? { brand } : {}),
+    ...(category ? { category } : {}),
+    ...(type ? { type } : {}),
+    ...(schedule ? { schedule } : {}),
+    ...(payment ? { payment } : {}),
     ...(unpaidOnly ? { unpaid: "1" } : {}),
     from: today,
     to: today,
@@ -193,10 +234,33 @@ export default async function SalesPage({
   if (billNo) activeFilterCount += 1;
   if (doctor) activeFilterCount += 1;
   if (patient) activeFilterCount += 1;
+  if (cashier) activeFilterCount += 1;
   if (product) activeFilterCount += 1;
+  if (brand) activeFilterCount += 1;
+  if (category) activeFilterCount += 1;
+  if (type) activeFilterCount += 1;
+  if (schedule) activeFilterCount += 1;
+  if (payment) activeFilterCount += 1;
   if (unpaidOnly) activeFilterCount += 1;
 
-  const extras = salesExtras(from, to, pageSize, billNo, doctor, patient, product, unpaidOnly, sort, dir);
+  const extras = salesExtras(
+    from,
+    to,
+    pageSize,
+    billNo,
+    doctor,
+    patient,
+    cashier,
+    product,
+    brand,
+    category,
+    type,
+    schedule,
+    payment,
+    unpaidOnly,
+    sort,
+    dir,
+  );
 
   const salesCardRows: SalesListCardRow[] = sales.map((s) => {
     const gross = Number(s.total);
@@ -256,17 +320,38 @@ export default async function SalesPage({
 
       <MobileFilterSheet
         title="Filter sales"
-        description="Defaults to today. Search by bill number, doctor, patient, or product name. Bill # matches any date."
+        description="Defaults to today. Filter by bill, people, product catalog (category, type, schedule, brand), or payment. Bill # matches any date."
         activeCount={activeFilterCount}
       >
         <SalesFilterForm
+          key={[
+            from,
+            to,
+            billNo,
+            doctor,
+            patient,
+            cashier,
+            product,
+            brand,
+            category,
+            type,
+            schedule,
+            payment,
+            unpaidOnly ? "1" : "",
+          ].join("\0")}
           actionPath="/dashboard/sales"
           from={from}
           to={to}
           billNo={billNo}
           doctor={doctor}
           patient={patient}
+          cashier={cashier}
           product={product}
+          brand={brand}
+          category={category}
+          type={type}
+          schedule={schedule}
+          payment={payment}
           unpaidOnly={unpaidOnly}
           initialOptions={filterOptions}
           hiddenLimit={pageSize !== DEFAULT_LIST_PAGE_SIZE ? String(pageSize) : undefined}
@@ -470,7 +555,11 @@ export default async function SalesPage({
         </table>
         {sales.length === 0 && (
           <p className="px-4 py-8 text-center text-zinc-500">
-            {billNo ? "No bill matches that number." : from || to ? "No bills in this date range." : "No sales yet."}
+            {billNo
+              ? "No bill matches that number."
+              : activeFilterCount > 0
+                ? "No bills match these filters."
+                : "No sales yet."}
           </p>
         )}
       </div>

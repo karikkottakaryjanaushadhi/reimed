@@ -35,7 +35,7 @@ export function productSearchRelevanceScore(name: string, query: string): number
   if (nameLower.startsWith(qLower)) return 2;
   if (nameCompact.startsWith(qCompact)) return 3;
 
-  const wordStartRe = new RegExp(`(^|\\s)${escapeRegExp(qLower)}($|\\s)`, "i");
+  const wordStartRe = new RegExp(`(^|\\s)${escapeRegExp(qLower)}`, "i");
   const wordMatch = wordStartRe.exec(name);
   if (wordMatch) return 10 + (wordMatch.index ?? 0);
 

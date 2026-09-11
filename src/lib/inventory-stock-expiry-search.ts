@@ -12,15 +12,24 @@ export function parseInventorySearch(q: string): InventorySearch | null {
   return { likePat: `%${needle}%` };
 }
 
-/** AND ( … ) for JOIN queries that alias lot as `il`, product as `p`. Matches product name only. */
-export function inventoryLotSearchAndClause(s: InventorySearch): Prisma.Sql {
-  return Prisma.sql`AND replace(lower(p."name"), ' ', '') LIKE ${s.likePat}`;
+/** Product ids whose compact name matches — uses Product_name_compact_trgm_idx. */
+export function inventoryProductNameMatchIdsSql(s: InventorySearch): Prisma.Sql {
+  return Prisma.sql`
+    SELECT p2."id"
+    FROM "Product" p2
+    WHERE replace(lower(p2."name"), ' ', '') LIKE ${s.likePat}
+  `;
 }
 
-/** Batches page: product name or batch number. */
+/** AND ( … ) for JOIN queries that alias lot as `il`. Matches product name only. */
+export function inventoryLotSearchAndClause(s: InventorySearch): Prisma.Sql {
+  return Prisma.sql`AND il."productId" IN (${inventoryProductNameMatchIdsSql(s)})`;
+}
+
+/** Batches page: product name (GIN on Product) or batch number (GIN on InventoryLot). */
 export function inventoryLotSearchIncludingBatchAndClause(s: InventorySearch): Prisma.Sql {
   return Prisma.sql`AND (
-    replace(lower(p."name"), ' ', '') LIKE ${s.likePat}
+    il."productId" IN (${inventoryProductNameMatchIdsSql(s)})
     OR replace(lower(il."batchNo"), ' ', '') LIKE ${s.likePat}
   )`;
 }

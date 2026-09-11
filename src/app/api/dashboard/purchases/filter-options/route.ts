@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { getAuthContext, isManager } from "@/lib/auth-context";
+import { parsePaymentModeFilter } from "@/lib/constants";
+import {
+  parseProductCategoryFilter,
+  parseProductScheduleFilter,
+  parseProductTypeFilter,
+} from "@/lib/products-filter-options";
 import {
   getPurchaseFilterOptions,
   type PurchaseDateOn,
@@ -33,8 +39,15 @@ export async function GET(req: Request) {
     to: searchParams.get("to") ?? undefined,
     dateOn: parseDateOn(searchParams.get("dateOn")),
     supplier: searchParams.get("supplier") ?? undefined,
+    cashier: searchParams.get("cashier") ?? undefined,
     invoice: searchParams.get("invoice") ?? undefined,
+    amount: searchParams.get("amount") ?? undefined,
     product: searchParams.get("product") ?? undefined,
+    brand: searchParams.get("brand") ?? undefined,
+    category: parseProductCategoryFilter(searchParams.get("category")),
+    type: parseProductTypeFilter(searchParams.get("type")),
+    schedule: parseProductScheduleFilter(searchParams.get("schedule")),
+    payment: parsePaymentModeFilter(searchParams.get("payment")),
     status: parseStatus(searchParams.get("status")),
     paid: parsePaid(searchParams.get("paid")),
   });

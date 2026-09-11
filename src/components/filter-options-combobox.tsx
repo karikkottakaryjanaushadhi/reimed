@@ -18,6 +18,7 @@ import {
   BILLING_DROPDOWN_OPTION_SELECTED_CLASS,
   floatingDropdownMaxHeight,
 } from "@/lib/floating-dropdown";
+import { sortByProductSearchRelevance } from "@/lib/search-normalize";
 
 function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
   if (!ref) return;
@@ -65,14 +66,16 @@ export function FilterOptionsCombobox({
   );
 
   const uniqueOptions = useMemo(
-    () => [...new Set(options.map((o) => o.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    () => [...new Set(options.map((o) => o.trim()).filter(Boolean))],
     [options],
   );
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return uniqueOptions;
-    return uniqueOptions.filter((o) => o.toLowerCase().includes(q));
+    const q = query.trim();
+    if (!q) return [...uniqueOptions].sort((a, b) => a.localeCompare(b));
+    const qLower = q.toLowerCase();
+    const matches = uniqueOptions.filter((o) => o.toLowerCase().includes(qLower));
+    return sortByProductSearchRelevance(matches, q, (o) => o);
   }, [uniqueOptions, query]);
 
   const updateRect = useCallback(() => {

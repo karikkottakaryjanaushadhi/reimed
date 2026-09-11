@@ -23,8 +23,14 @@ import {
   parseListLimitParam,
 } from "@/lib/list-pagination";
 import { roundMoney } from "@/lib/bill-round";
+import { parsePaymentModeFilter } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
-import { buildPurchaseFilterWhere, getPurchaseFilterOptions } from "@/lib/purchases-filter-options";
+import { getPurchaseFilterOptions, resolvePurchaseFilterWhere } from "@/lib/purchases-filter-options";
+import {
+  parseProductCategoryFilter,
+  parseProductScheduleFilter,
+  parseProductTypeFilter,
+} from "@/lib/products-filter-options";
 import { purchaseBillTotalsFromLines } from "@/lib/purchase-line";
 import { snapProductGstPct } from "@/lib/product-gst-slabs";
 
@@ -44,8 +50,15 @@ function purchaseListExtras(
   to: string,
   dateOn: PurchaseDateOn,
   supplier: string,
+  cashier: string,
   invoice: string,
+  amount: string,
   product: string,
+  brand: string,
+  category: string,
+  type: string,
+  schedule: string,
+  payment: string,
   status: PurchaseStatusFilter,
   paid: PurchasePaidFilter,
   pageSize: number,
@@ -57,8 +70,15 @@ function purchaseListExtras(
   if (to) e.to = to;
   if (dateOn !== "recorded") e.dateOn = dateOn;
   if (supplier) e.supplier = supplier;
+  if (cashier) e.cashier = cashier;
   if (invoice) e.invoice = invoice;
+  if (amount) e.amount = amount;
   if (product) e.product = product;
+  if (brand) e.brand = brand;
+  if (category) e.category = category;
+  if (type) e.type = type;
+  if (schedule) e.schedule = schedule;
+  if (payment) e.payment = payment;
   if (status) e.status = status;
   if (paid) e.paid = paid;
   if (pageSize !== DEFAULT_LIST_PAGE_SIZE) e.limit = String(pageSize);
@@ -151,8 +171,15 @@ export default async function PurchasesPage({
     to?: string;
     dateOn?: string;
     supplier?: string;
+    cashier?: string;
     invoice?: string;
+    amount?: string;
     product?: string;
+    brand?: string;
+    category?: string;
+    type?: string;
+    schedule?: string;
+    payment?: string;
     status?: string;
     paid?: string;
     sort?: string;
@@ -176,8 +203,15 @@ export default async function PurchasesPage({
   const to = trimDateParam(sp.to) || monthTo;
   const dateOn = parsePurchaseDateOn(sp.dateOn);
   const supplier = typeof sp.supplier === "string" ? sp.supplier.trim() : "";
+  const cashier = typeof sp.cashier === "string" ? sp.cashier.trim() : "";
   const invoice = typeof sp.invoice === "string" ? sp.invoice.trim() : "";
+  const amount = typeof sp.amount === "string" ? sp.amount.trim() : "";
   const product = typeof sp.product === "string" ? sp.product.trim() : "";
+  const brand = typeof sp.brand === "string" ? sp.brand.trim() : "";
+  const category = parseProductCategoryFilter(sp.category);
+  const type = parseProductTypeFilter(sp.type);
+  const schedule = parseProductScheduleFilter(sp.schedule);
+  const payment = parsePaymentModeFilter(sp.payment);
   const status = parsePurchaseStatus(sp.status);
   const paid = parsePurchasePaid(sp.paid);
   const sort =
@@ -196,13 +230,20 @@ export default async function PurchasesPage({
     to,
     dateOn,
     supplier,
+    cashier,
     invoice,
+    amount,
     product,
+    brand,
+    category,
+    type,
+    schedule,
+    payment,
     status,
     paid,
   };
 
-  const where = buildPurchaseFilterWhere(filterParams);
+  const where = await resolvePurchaseFilterWhere(filterParams);
   const skipGuess = (rawPage - 1) * pageSize;
 
   const [filterOptions, totalCount, purchasesGuess] = await Promise.all([
@@ -283,8 +324,15 @@ export default async function PurchasesPage({
     to,
     dateOn,
     supplier,
+    cashier,
     invoice,
+    amount,
     product,
+    brand,
+    category,
+    type,
+    schedule,
+    payment,
     status,
     paid,
     pageSize,
@@ -302,8 +350,15 @@ export default async function PurchasesPage({
     ...(dir !== "desc" ? { dir } : {}),
     ...(dateOn !== "recorded" ? { dateOn } : {}),
     ...(supplier ? { supplier } : {}),
+    ...(cashier ? { cashier } : {}),
     ...(invoice ? { invoice } : {}),
+    ...(amount ? { amount } : {}),
     ...(product ? { product } : {}),
+    ...(brand ? { brand } : {}),
+    ...(category ? { category } : {}),
+    ...(type ? { type } : {}),
+    ...(schedule ? { schedule } : {}),
+    ...(payment ? { payment } : {}),
     ...(status ? { status } : {}),
     ...(paid ? { paid } : {}),
     from: monthFrom,
@@ -315,8 +370,15 @@ export default async function PurchasesPage({
   const hasActiveFilters = !!(
     !datesAreDefault ||
     supplier ||
+    cashier ||
     invoice ||
+    amount ||
     product ||
+    brand ||
+    category ||
+    type ||
+    schedule ||
+    payment ||
     status ||
     paid ||
     dateOn !== "recorded"
@@ -326,8 +388,15 @@ export default async function PurchasesPage({
   if (!datesAreDefault) activeFilterCount += 1;
   if (dateOn !== "recorded") activeFilterCount += 1;
   if (supplier) activeFilterCount += 1;
+  if (cashier) activeFilterCount += 1;
   if (invoice) activeFilterCount += 1;
+  if (amount) activeFilterCount += 1;
   if (product) activeFilterCount += 1;
+  if (brand) activeFilterCount += 1;
+  if (category) activeFilterCount += 1;
+  if (type) activeFilterCount += 1;
+  if (schedule) activeFilterCount += 1;
+  if (payment) activeFilterCount += 1;
   if (status) activeFilterCount += 1;
   if (paid) activeFilterCount += 1;
 
@@ -393,18 +462,41 @@ export default async function PurchasesPage({
 
       <MobileFilterSheet
         title="Filter purchases"
-        description={`Defaults to this month. Filter by ${dateOnLabel}, supplier, invoice, product, status, or payment.`}
+        description={`Defaults to this month. Filter by ${dateOnLabel}, supplier, catalog (category, type, schedule, brand), total, status, or payment.`}
         activeCount={activeFilterCount}
       >
         <PurchasesFilterForm
-          key={[from, to, dateOn, supplier, invoice, product, status, paid].join("\0")}
+          key={[
+            from,
+            to,
+            dateOn,
+            supplier,
+            cashier,
+            invoice,
+            amount,
+            product,
+            brand,
+            category,
+            type,
+            schedule,
+            payment,
+            status,
+            paid,
+          ].join("\0")}
           actionPath="/dashboard/purchases"
           from={from}
           to={to}
           dateOn={dateOn}
           supplier={supplier}
+          cashier={cashier}
           invoice={invoice}
+          amount={amount}
           product={product}
+          brand={brand}
+          category={category}
+          type={type}
+          schedule={schedule}
+          payment={payment}
           status={status}
           paid={paid}
           initialOptions={filterOptions}

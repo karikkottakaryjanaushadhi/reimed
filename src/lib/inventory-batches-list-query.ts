@@ -18,10 +18,7 @@ import { lotPackSize } from "@/lib/inventory-lot-pack-size";
 import { gstPctNumber } from "@/lib/product-gst-slabs";
 import { parseProductCategoryFilter, parseProductScheduleFilter, parseProductTypeFilter } from "@/lib/products-filter-options";
 import { prisma } from "@/lib/prisma";
-import {
-  resolveStockLevelsFilters,
-  type StockLevelsFilters,
-} from "@/lib/stock-levels-list-query";
+import { type StockLevelsFilters } from "@/lib/stock-levels-list-query";
 
 export type InventoryBatchesSort =
   | "productName"
@@ -194,9 +191,13 @@ export async function resolveInventoryBatchesFilters(params: {
   schedule?: string;
   qty?: string;
 }): Promise<InventoryBatchesFilters> {
-  const base = await resolveStockLevelsFilters(params);
   return {
-    ...base,
+    q: typeof params.q === "string" ? params.q : "",
+    supplierId: params.supplierId?.trim() ?? "",
+    brandId: params.brandId?.trim() ?? "",
+    expiry: typeof params.expiry === "string" ? params.expiry : "",
+    expiryOn: typeof params.expiryOn === "string" ? params.expiryOn : "",
+    lowStock: params.lowStock === true,
     category: parseProductCategoryFilter(params.category),
     type: parseProductTypeFilter(params.type),
     schedule: parseProductScheduleFilter(params.schedule),
@@ -204,115 +205,38 @@ export async function resolveInventoryBatchesFilters(params: {
   };
 }
 
-export async function countInventoryBatches(params: {
-  storeId: string;
-  filters: InventoryBatchesFilters;
-}): Promise<number> {
-  const clauses = buildBatchFilterClauses(params.filters);
-  const [row] = await prisma.$queryRaw<Array<{ c: unknown }>>(
-    Prisma.sql`
-      SELECT COUNT(*) AS c
-      FROM "InventoryLot" il
-      INNER JOIN "Product" p ON p."id" = il."productId"
-      WHERE il."storeId" = ${params.storeId}
-      ${clauses.searchClause}
-      ${clauses.supplierClause}
-      ${clauses.brandClause}
-      ${clauses.expiryClause}
-      ${clauses.lowStockClause}
-      ${clauses.extra.categoryClause}
-      ${clauses.extra.typeClause}
-      ${clauses.extra.scheduleClause}
-      ${clauses.extra.qtyClause}
-    `,
-  );
-  const n = row?.c;
+function toCount(n: unknown): number {
   if (typeof n === "bigint") return Number(n);
   if (typeof n === "number" && Number.isFinite(n)) return n;
   const x = Number(n);
   return Number.isFinite(x) ? x : 0;
 }
 
-export async function queryInventoryBatches(params: {
-  storeId: string;
-  filters: InventoryBatchesFilters;
-  sort?: string;
-  dir?: string;
-  limit?: number;
-  offset?: number;
-}): Promise<InventoryBatchListRow[]> {
-  const clauses = buildBatchFilterClauses(params.filters);
-  const sort = parseInventoryBatchesSort(params.sort);
-  const dir = parseInventoryBatchesDir(params.dir);
-  const limitClause =
-    params.limit != null
-      ? Prisma.sql`LIMIT ${params.limit} OFFSET ${params.offset ?? 0}`
-      : Prisma.sql``;
+type BatchSqlRow = {
+  id: string;
+  productId: string;
+  productName: string;
+  brandId: string | null;
+  brandName: string | null;
+  productCategory: string | null;
+  gstPct: unknown;
+  packSize: unknown;
+  productPackSize: unknown;
+  supplierName: string | null;
+  batchNo: string;
+  expiryDate: Date;
+  quantity: unknown;
+  reorderMin: unknown;
+  costPrice: unknown;
+  mrp: unknown;
+  saleRate: unknown;
+  salesDiscountPct: unknown;
+  salesDiscountRs: unknown;
+  stockCorrected: boolean;
+  _total?: unknown;
+};
 
-  const rows = await prisma.$queryRaw<
-    Array<{
-      id: string;
-      productId: string;
-      productName: string;
-      brandId: string | null;
-      brandName: string | null;
-      productCategory: string | null;
-      gstPct: unknown;
-      packSize: unknown;
-      productPackSize: unknown;
-      supplierName: string | null;
-      batchNo: string;
-      expiryDate: Date;
-      quantity: unknown;
-      reorderMin: unknown;
-      costPrice: unknown;
-      mrp: unknown;
-      saleRate: unknown;
-      salesDiscountPct: unknown;
-      salesDiscountRs: unknown;
-      stockCorrected: boolean;
-    }>
-  >(
-    Prisma.sql`
-      SELECT il."id" AS "id",
-             il."productId" AS "productId",
-             p."name" AS "productName",
-             p."brandId" AS "brandId",
-             b."name" AS "brandName",
-             p."productCategory" AS "productCategory",
-             p."gstPct" AS "gstPct",
-             il."packSize" AS "packSize",
-             p."packSize" AS "productPackSize",
-             s."name" AS "supplierName",
-             il."batchNo" AS "batchNo",
-             il."expiryDate" AS "expiryDate",
-             il."quantity" AS "quantity",
-             p."reorderMin" AS "reorderMin",
-             il."costPrice" AS "costPrice",
-             il."mrp" AS "mrp",
-             il."saleRate" AS "saleRate",
-             il."salesDiscountPct" AS "salesDiscountPct",
-             il."salesDiscountRs" AS "salesDiscountRs",
-             il."stockCorrected" AS "stockCorrected"
-      FROM "InventoryLot" il
-      INNER JOIN "Product" p ON p."id" = il."productId"
-      LEFT JOIN "Brand" b ON b."id" = p."brandId"
-      LEFT JOIN "Supplier" s ON s."id" = il."supplierId"
-      WHERE il."storeId" = ${params.storeId}
-      ${clauses.searchClause}
-      ${clauses.supplierClause}
-      ${clauses.brandClause}
-      ${clauses.expiryClause}
-      ${clauses.lowStockClause}
-      ${clauses.extra.categoryClause}
-      ${clauses.extra.typeClause}
-      ${clauses.extra.scheduleClause}
-      ${clauses.extra.qtyClause}
-      ORDER BY ${batchSortOrder(sort, dir)}
-      ${limitClause}
-    `,
-  );
-
+function mapBatchRows(rows: BatchSqlRow[]): InventoryBatchListRow[] {
   const today = startOfDay(new Date());
   return rows.map((l) => {
     const d = differenceInCalendarDays(l.expiryDate, today);
@@ -340,4 +264,151 @@ export async function queryInventoryBatches(params: {
       expiryTint: expiryTintFromDays(d),
     };
   });
+}
+
+function batchFilteredFromSql(
+  storeId: string,
+  clauses: ReturnType<typeof buildBatchFilterClauses>,
+  sort: InventoryBatchesSort,
+) {
+  const sortBrandJoin =
+    sort === "brand" ? Prisma.sql`LEFT JOIN "Brand" b ON b."id" = p."brandId"` : Prisma.sql``;
+  const sortSupplierJoin =
+    sort === "supplier" ? Prisma.sql`LEFT JOIN "Supplier" s ON s."id" = il."supplierId"` : Prisma.sql``;
+  return Prisma.sql`
+    FROM "InventoryLot" il
+    INNER JOIN "Product" p ON p."id" = il."productId"
+    ${sortBrandJoin}
+    ${sortSupplierJoin}
+    WHERE il."storeId" = ${storeId}
+    ${clauses.searchClause}
+    ${clauses.supplierClause}
+    ${clauses.brandClause}
+    ${clauses.expiryClause}
+    ${clauses.lowStockClause}
+    ${clauses.extra.categoryClause}
+    ${clauses.extra.typeClause}
+    ${clauses.extra.scheduleClause}
+    ${clauses.extra.qtyClause}
+  `;
+}
+
+async function fetchInventoryBatches(params: {
+  storeId: string;
+  filters: InventoryBatchesFilters;
+  sort?: string;
+  dir?: string;
+  limit?: number;
+  offset?: number;
+  includeTotalWindow?: boolean;
+}): Promise<BatchSqlRow[]> {
+  const clauses = buildBatchFilterClauses(params.filters);
+  const sort = parseInventoryBatchesSort(params.sort);
+  const dir = parseInventoryBatchesDir(params.dir);
+  const limitClause =
+    params.limit != null
+      ? Prisma.sql`LIMIT ${params.limit} OFFSET ${params.offset ?? 0}`
+      : Prisma.sql``;
+  const totalCol = params.includeTotalWindow
+    ? Prisma.sql`, COUNT(*) OVER() AS "_total"`
+    : Prisma.sql``;
+  const fromWhere = batchFilteredFromSql(params.storeId, clauses, sort);
+
+  return prisma.$queryRaw<BatchSqlRow[]>(
+    Prisma.sql`
+      SELECT lot."id" AS "id",
+             lot."productId" AS "productId",
+             lot."productName" AS "productName",
+             lot."brandId" AS "brandId",
+             b."name" AS "brandName",
+             lot."productCategory" AS "productCategory",
+             lot."gstPct" AS "gstPct",
+             lot."packSize" AS "packSize",
+             lot."productPackSize" AS "productPackSize",
+             s."name" AS "supplierName",
+             lot."batchNo" AS "batchNo",
+             lot."expiryDate" AS "expiryDate",
+             lot."quantity" AS "quantity",
+             lot."reorderMin" AS "reorderMin",
+             lot."costPrice" AS "costPrice",
+             lot."mrp" AS "mrp",
+             lot."saleRate" AS "saleRate",
+             lot."salesDiscountPct" AS "salesDiscountPct",
+             lot."salesDiscountRs" AS "salesDiscountRs",
+             lot."stockCorrected" AS "stockCorrected"
+             ${params.includeTotalWindow ? Prisma.sql`, lot."_total" AS "_total"` : Prisma.sql``}
+      FROM (
+        SELECT il."id" AS "id",
+               il."productId" AS "productId",
+               p."name" AS "productName",
+               p."brandId" AS "brandId",
+               p."productCategory" AS "productCategory",
+               p."gstPct" AS "gstPct",
+               il."packSize" AS "packSize",
+               p."packSize" AS "productPackSize",
+               il."supplierId" AS "supplierId",
+               il."batchNo" AS "batchNo",
+               il."expiryDate" AS "expiryDate",
+               il."quantity" AS "quantity",
+               p."reorderMin" AS "reorderMin",
+               il."costPrice" AS "costPrice",
+               il."mrp" AS "mrp",
+               il."saleRate" AS "saleRate",
+               il."salesDiscountPct" AS "salesDiscountPct",
+               il."salesDiscountRs" AS "salesDiscountRs",
+               il."stockCorrected" AS "stockCorrected"
+               ${totalCol}
+        ${fromWhere}
+        ORDER BY ${batchSortOrder(sort, dir)}
+        ${limitClause}
+      ) lot
+      LEFT JOIN "Brand" b ON b."id" = lot."brandId"
+      LEFT JOIN "Supplier" s ON s."id" = lot."supplierId"
+    `,
+  );
+}
+
+export async function countInventoryBatches(params: {
+  storeId: string;
+  filters: InventoryBatchesFilters;
+}): Promise<number> {
+  const clauses = buildBatchFilterClauses(params.filters);
+  const [row] = await prisma.$queryRaw<Array<{ c: unknown }>>(
+    Prisma.sql`
+      SELECT COUNT(*) AS c
+      ${batchFilteredFromSql(params.storeId, clauses, "productName")}
+    `,
+  );
+  return toCount(row?.c);
+}
+
+export async function queryInventoryBatches(params: {
+  storeId: string;
+  filters: InventoryBatchesFilters;
+  sort?: string;
+  dir?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<InventoryBatchListRow[]> {
+  const rows = await fetchInventoryBatches(params);
+  return mapBatchRows(rows);
+}
+
+export async function queryInventoryBatchesPage(params: {
+  storeId: string;
+  filters: InventoryBatchesFilters;
+  sort?: string;
+  dir?: string;
+  limit: number;
+  offset: number;
+}): Promise<{ rows: InventoryBatchListRow[]; total: number }> {
+  if (params.offset <= 0) {
+    const rows = await fetchInventoryBatches({ ...params, includeTotalWindow: true });
+    return { rows: mapBatchRows(rows), total: toCount(rows[0]?._total) };
+  }
+  const [total, rows] = await Promise.all([
+    countInventoryBatches({ storeId: params.storeId, filters: params.filters }),
+    queryInventoryBatches(params),
+  ]);
+  return { rows, total };
 }

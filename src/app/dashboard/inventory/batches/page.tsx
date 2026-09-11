@@ -12,14 +12,10 @@ import {
   parseListLimitParam,
 } from "@/lib/list-pagination";
 import { getInventoryFilterOptions, parseInventoryLotQtyFilter } from "@/lib/inventory-filter-options";
-import { prisma } from "@/lib/prisma";
 import { EXPIRY_SOON_DAYS, hasActiveExpiryFilter, resolveExpiryFilter } from "@/lib/inventory-expiry-filter";
 import { parseProductCategoryFilter, parseProductScheduleFilter, parseProductTypeFilter } from "@/lib/products-filter-options";
 import { getBrandOptions } from "@/lib/brand-options";
-import {
-  countInventoryBatches,
-  queryInventoryBatches,
-} from "@/lib/inventory-batches-list-query";
+import { queryInventoryBatchesPage } from "@/lib/inventory-batches-list-query";
 import {
   InventoryBatchTable,
   type BatchRow,
@@ -249,53 +245,10 @@ export default async function InventoryBatchesPage({
   const canAdjust = true;
   const storeId = ctx.activeStoreId;
 
-  const [filterOptions, brandOptions] = await Promise.all([
-    getInventoryFilterOptions({
-      storeId,
-      q,
-      supplierId: rawSupplierId,
-      brandId: rawBrandId,
-      expiry: expiryRaw,
-      expiryOn: expiryOnRaw,
-      lowStock: lowStockOnly,
-      category,
-      type,
-      schedule,
-      qty,
-    }),
-    getBrandOptions(),
-  ]);
-
-  let supplierFilterId = "";
-  if (rawSupplierId) {
-    const match = filterOptions.suppliers.find((s) => s.id === rawSupplierId);
-    if (match) supplierFilterId = match.id;
-    else {
-      const exists = await prisma.supplier.findFirst({
-        where: { id: rawSupplierId, inventoryLots: { some: { storeId } } },
-        select: { id: true },
-      });
-      if (exists) supplierFilterId = rawSupplierId;
-    }
-  }
-
-  let brandFilterId = "";
-  if (rawBrandId) {
-    const match = filterOptions.brands.find((b) => b.id === rawBrandId);
-    if (match) brandFilterId = match.id;
-    else {
-      const exists = await prisma.brand.findFirst({
-        where: { id: rawBrandId },
-        select: { id: true },
-      });
-      if (exists) brandFilterId = rawBrandId;
-    }
-  }
-
   const filters: BatchFilters = {
     q,
-    supplierId: supplierFilterId,
-    brandId: brandFilterId,
+    supplierId: rawSupplierId,
+    brandId: rawBrandId,
     expiry: expiryPreset,
     expiryOn: expiryOnFilter,
     lowStock: lowStockOnly,
@@ -318,9 +271,23 @@ export default async function InventoryBatchesPage({
     schedule: filters.schedule,
     qty: parseInventoryLotQtyFilter(filters.qty),
   };
-  const [batchTotal, batchGuess] = await Promise.all([
-    countInventoryBatches({ storeId, filters: listFilters }),
-    queryInventoryBatches({
+
+  const [filterOptions, brandOptions, pageResult] = await Promise.all([
+    getInventoryFilterOptions({
+      storeId,
+      q,
+      supplierId: rawSupplierId,
+      brandId: rawBrandId,
+      expiry: expiryRaw,
+      expiryOn: expiryOnRaw,
+      lowStock: lowStockOnly,
+      category,
+      type,
+      schedule,
+      qty,
+    }),
+    getBrandOptions(),
+    queryInventoryBatchesPage({
       storeId,
       filters: listFilters,
       sort,
@@ -329,20 +296,27 @@ export default async function InventoryBatchesPage({
       offset: skipGuess,
     }),
   ]);
+
+  let batchTotal = pageResult.total;
+  let batchRows: BatchRow[] = pageResult.rows;
   const totalBatchPages = Math.max(1, Math.ceil(batchTotal / batchPageSize));
   const bpage = Math.min(rawBpage, totalBatchPages);
   const batchSkip = (bpage - 1) * batchPageSize;
-  const batchRows: BatchRow[] =
-    batchSkip === skipGuess
-      ? batchGuess
-      : await queryInventoryBatches({
-          storeId,
-          filters: listFilters,
-          sort,
-          dir,
-          limit: batchPageSize,
-          offset: batchSkip,
-        });
+  if (batchSkip !== skipGuess) {
+    const corrected = await queryInventoryBatchesPage({
+      storeId,
+      filters: listFilters,
+      sort,
+      dir,
+      limit: batchPageSize,
+      offset: batchSkip,
+    });
+    batchTotal = corrected.total;
+    batchRows = corrected.rows;
+  }
+
+  const supplierFilterId = filters.supplierId;
+  const brandFilterId = filters.brandId;
 
   const toStock = new URLSearchParams();
   if (q.trim()) toStock.set("q", q.trim());
