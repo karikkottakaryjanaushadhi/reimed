@@ -94,58 +94,117 @@ export function parseInventoryBatchesDir(raw: unknown): "asc" | "desc" {
   return raw === "asc" || raw === "desc" ? raw : "asc";
 }
 
-function batchSortOrder(sort: InventoryBatchesSort, dir: "asc" | "desc") {
+function batchSortOrder(
+  sort: InventoryBatchesSort,
+  dir: "asc" | "desc",
+  cols: {
+    productName: Prisma.Sql;
+    productCategory: Prisma.Sql;
+    gstPct: Prisma.Sql;
+    packSize: Prisma.Sql;
+    batchNo: Prisma.Sql;
+    expiryDate: Prisma.Sql;
+    quantity: Prisma.Sql;
+    reorderMin: Prisma.Sql;
+    costPrice: Prisma.Sql;
+    mrp: Prisma.Sql;
+    saleRate: Prisma.Sql;
+    salesDiscountPct: Prisma.Sql;
+    salesDiscountRs: Prisma.Sql;
+    stockCorrected: Prisma.Sql;
+    brandName: Prisma.Sql;
+    supplierName: Prisma.Sql;
+  },
+) {
+  const nameThenBatch = Prisma.sql`${cols.productName} ASC, ${cols.batchNo} ASC`;
   switch (sort) {
     case "brand":
-      return Prisma.sql`COALESCE(b."name", '') ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+      return Prisma.sql`COALESCE(${cols.brandName}, '') ${Prisma.raw(dir)}, ${nameThenBatch}`;
     case "productCategory":
-      return Prisma.sql`p."productCategory" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+      return Prisma.sql`${cols.productCategory} ${Prisma.raw(dir)}, ${nameThenBatch}`;
     case "gstPct":
-      return Prisma.sql`p."gstPct" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+      return Prisma.sql`${cols.gstPct} ${Prisma.raw(dir)}, ${nameThenBatch}`;
     case "packSize":
-      return Prisma.sql`il."packSize" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+      return Prisma.sql`${cols.packSize} ${Prisma.raw(dir)}, ${nameThenBatch}`;
     case "supplier":
-      return Prisma.sql`COALESCE(s."name", '') ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+      return Prisma.sql`COALESCE(${cols.supplierName}, '') ${Prisma.raw(dir)}, ${nameThenBatch}`;
     case "batchNo":
-      return Prisma.sql`il."batchNo" ${Prisma.raw(dir)}, p."name" ASC`;
+      return Prisma.sql`${cols.batchNo} ${Prisma.raw(dir)}, ${cols.productName} ASC`;
     case "expiryDate":
-      return Prisma.sql`il."expiryDate" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
     case "days":
-      return Prisma.sql`il."expiryDate" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+      return Prisma.sql`${cols.expiryDate} ${Prisma.raw(dir)}, ${nameThenBatch}`;
     case "quantity":
-      return Prisma.sql`il."quantity" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+      return Prisma.sql`${cols.quantity} ${Prisma.raw(dir)}, ${nameThenBatch}`;
     case "reorderMin":
-      return Prisma.sql`p."reorderMin" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+      return Prisma.sql`${cols.reorderMin} ${Prisma.raw(dir)}, ${nameThenBatch}`;
     case "costPrice":
-      return Prisma.sql`il."costPrice" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+      return Prisma.sql`${cols.costPrice} ${Prisma.raw(dir)}, ${nameThenBatch}`;
     case "mrp":
-      return Prisma.sql`il."mrp" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+      return Prisma.sql`${cols.mrp} ${Prisma.raw(dir)}, ${nameThenBatch}`;
     case "saleRate":
-      return Prisma.sql`il."saleRate" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+      return Prisma.sql`${cols.saleRate} ${Prisma.raw(dir)}, ${nameThenBatch}`;
     case "salesDiscountPct":
-      return Prisma.sql`il."salesDiscountPct" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+      return Prisma.sql`${cols.salesDiscountPct} ${Prisma.raw(dir)}, ${nameThenBatch}`;
     case "salesDiscountRs":
-      return Prisma.sql`il."salesDiscountRs" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+      return Prisma.sql`${cols.salesDiscountRs} ${Prisma.raw(dir)}, ${nameThenBatch}`;
     case "marginPercent":
       return Prisma.sql`
           CASE
-            WHEN il."saleRate" > 0 THEN
+            WHEN ${cols.saleRate} > 0 THEN
               ROUND(
                 (
-                  il."saleRate"
-                  - ROUND((il."saleRate" * COALESCE(p."gstPct", 0) / (100 + COALESCE(p."gstPct", 0)))::numeric, 2)
-                  - il."costPrice"
-                ) / il."saleRate" * 10000
+                  ${cols.saleRate}
+                  - ROUND((${cols.saleRate} * COALESCE(${cols.gstPct}, 0) / (100 + COALESCE(${cols.gstPct}, 0)))::numeric, 2)
+                  - ${cols.costPrice}
+                ) / ${cols.saleRate} * 10000
               ) / 100
             ELSE 0
-          END ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+          END ${Prisma.raw(dir)}, ${nameThenBatch}`;
     case "stockCorrected":
-      return Prisma.sql`il."stockCorrected" ${Prisma.raw(dir)}, p."name" ASC, il."batchNo" ASC`;
+      return Prisma.sql`${cols.stockCorrected} ${Prisma.raw(dir)}, ${nameThenBatch}`;
     case "productName":
     default:
-      return Prisma.sql`p."name" ${Prisma.raw(dir)}, il."batchNo" ASC`;
+      return Prisma.sql`${cols.productName} ${Prisma.raw(dir)}, ${cols.batchNo} ASC`;
   }
 }
+
+const INNER_SORT_COLS = {
+  productName: Prisma.sql`p."name"`,
+  productCategory: Prisma.sql`p."productCategory"`,
+  gstPct: Prisma.sql`p."gstPct"`,
+  packSize: Prisma.sql`il."packSize"`,
+  batchNo: Prisma.sql`il."batchNo"`,
+  expiryDate: Prisma.sql`il."expiryDate"`,
+  quantity: Prisma.sql`il."quantity"`,
+  reorderMin: Prisma.sql`p."reorderMin"`,
+  costPrice: Prisma.sql`il."costPrice"`,
+  mrp: Prisma.sql`il."mrp"`,
+  saleRate: Prisma.sql`il."saleRate"`,
+  salesDiscountPct: Prisma.sql`il."salesDiscountPct"`,
+  salesDiscountRs: Prisma.sql`il."salesDiscountRs"`,
+  stockCorrected: Prisma.sql`il."stockCorrected"`,
+  brandName: Prisma.sql`b."name"`,
+  supplierName: Prisma.sql`s."name"`,
+};
+
+const OUTER_SORT_COLS = {
+  productName: Prisma.sql`lot."productName"`,
+  productCategory: Prisma.sql`lot."productCategory"`,
+  gstPct: Prisma.sql`lot."gstPct"`,
+  packSize: Prisma.sql`lot."packSize"`,
+  batchNo: Prisma.sql`lot."batchNo"`,
+  expiryDate: Prisma.sql`lot."expiryDate"`,
+  quantity: Prisma.sql`lot."quantity"`,
+  reorderMin: Prisma.sql`lot."reorderMin"`,
+  costPrice: Prisma.sql`lot."costPrice"`,
+  mrp: Prisma.sql`lot."mrp"`,
+  saleRate: Prisma.sql`lot."saleRate"`,
+  salesDiscountPct: Prisma.sql`lot."salesDiscountPct"`,
+  salesDiscountRs: Prisma.sql`lot."salesDiscountRs"`,
+  stockCorrected: Prisma.sql`lot."stockCorrected"`,
+  brandName: Prisma.sql`b."name"`,
+  supplierName: Prisma.sql`s."name"`,
+};
 
 export type InventoryBatchesFilters = StockLevelsFilters & {
   category: string;
@@ -359,11 +418,12 @@ async function fetchInventoryBatches(params: {
                il."stockCorrected" AS "stockCorrected"
                ${totalCol}
         ${fromWhere}
-        ORDER BY ${batchSortOrder(sort, dir)}
+        ORDER BY ${batchSortOrder(sort, dir, INNER_SORT_COLS)}
         ${limitClause}
       ) lot
       LEFT JOIN "Brand" b ON b."id" = lot."brandId"
       LEFT JOIN "Supplier" s ON s."id" = lot."supplierId"
+      ORDER BY ${batchSortOrder(sort, dir, OUTER_SORT_COLS)}
     `,
   );
 }
