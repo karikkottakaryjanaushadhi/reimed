@@ -251,6 +251,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
   const [supplierFocused, setSupplierFocused] = useState(false);
   const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
+  const [remark, setRemark] = useState("");
   const [draftQ, setDraftQ] = useState("");
   const [draftHits, setDraftHits] = useState<PurchaseProductSearchHit[]>([]);
   const [draft, setDraft] = useState<Line>(() => emptyDraftLine());
@@ -273,8 +274,6 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
   /** Committed line index when modal edits a saved row; null = draft row. */
   const [newProductModalLineIndex, setNewProductModalLineIndex] = useState<number | null>(null);
   const [billingPreview, setBillingPreview] = useState<InvoiceBillJson["billing_summary"] | null>(null);
-  /** Saved with purchase when JSON import includes seller/buyer/bank etc. */
-  const [importMetaNotes, setImportMetaNotes] = useState("");
   /** Checked = still editing after post (purchase stays open on detail). Uncheck before posting to finalize at once. */
   const [editingInProgress, setEditingInProgress] = useState(true);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("CASH");
@@ -301,7 +300,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
         billPaid,
         paidAt,
         paymentRefLast4,
-        importMetaNotes,
+        importMetaNotes: remark,
         saleRateDrafts: {},
       }),
     [
@@ -309,6 +308,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
       supplierQ,
       invoiceNo,
       invoiceDate,
+      remark,
       lines,
       draft,
       draftQ,
@@ -318,7 +318,6 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
       billPaid,
       paidAt,
       paymentRefLast4,
-      importMetaNotes,
     ],
   );
 
@@ -340,6 +339,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
     supplierPickedLabelRef.current = d.supplierId ? d.supplierQ : null;
     setInvoiceNo(d.invoiceNo);
     setInvoiceDate(d.invoiceDate);
+    setRemark(d.importMetaNotes);
     setLines(d.lines);
     setDraft(d.draftLine);
     setDraftQ(d.draftQ);
@@ -349,7 +349,6 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
     setBillPaid(d.billPaid ?? false);
     setPaidAt(d.paidAt || todayPaidAtYmd());
     setPaymentRefLast4(d.paymentRefLast4 ?? "");
-    setImportMetaNotes(d.importMetaNotes);
     setDraftKey((k) => k + 1);
     setLinkRowIndex(null);
     setLinkSearchQ("");
@@ -1032,7 +1031,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
     }
 
     setBillingPreview(data.billing_summary ?? null);
-    setImportMetaNotes(buildImportMetaNotes(data));
+    setRemark(buildImportMetaNotes(data));
 
     const items = data.items ?? [];
     const nextLines: Line[] = [];
@@ -1192,7 +1191,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
           supplierId,
           invoiceRef: invoiceNo.trim() || undefined,
           invoiceDate: invoiceDate.trim(),
-          notes: importMetaNotes.trim() || undefined,
+          notes: remark.trim() || undefined,
           complete: !editingInProgress,
           paymentMode,
           paid: billPaid,
@@ -1219,7 +1218,6 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
       setDraftHitHi(-1);
       setDraftKey((k) => k + 1);
       setBillingPreview(null);
-      setImportMetaNotes("");
       setEditingInProgress(true);
       setPaymentMode("CASH");
       setBillPaid(false);
@@ -1227,6 +1225,7 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
       setPaymentRefLast4("");
       setInvoiceNo("");
       setInvoiceDate("");
+      setRemark("");
       setSupplierId("");
       setSupplierQ("");
       supplierPickedLabelRef.current = null;
@@ -2141,6 +2140,17 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
           />
         </label>
       </div>
+      <label className="mt-3 block text-sm">
+        <span className="text-zinc-500">Remark</span>
+        <textarea
+          className="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-2 dark:border-zinc-600 dark:bg-zinc-950"
+          rows={2}
+          maxLength={2000}
+          value={remark}
+          onChange={(e) => setRemark(e.target.value)}
+          placeholder="Optional note on this bill"
+        />
+      </label>
 
       <div ref={purchaseMobileScrollRef} className="mt-3 space-y-2 md:hidden" aria-label="Purchase items">
         {lines.map((line, i) => renderMobileLineCard(line, i))}

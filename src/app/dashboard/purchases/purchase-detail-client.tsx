@@ -25,6 +25,7 @@ export function PurchaseDetailClient({
   initialSupplierName,
   initialInvoiceRef,
   initialInvoiceDate,
+  initialNotes,
   initialLocked,
   lines,
 }: {
@@ -33,6 +34,7 @@ export function PurchaseDetailClient({
   initialSupplierName: string;
   initialInvoiceRef: string | null;
   initialInvoiceDate: string | null;
+  initialNotes: string | null;
   initialLocked: boolean;
   lines: PurchaseLineDraft[];
 }) {
@@ -46,6 +48,7 @@ export function PurchaseDetailClient({
   const [supplierId, setSupplierId] = useState(initialSupplierId);
   const [invoiceRef, setInvoiceRef] = useState(initialInvoiceRef ?? "");
   const [invoiceDate, setInvoiceDate] = useState(initialInvoiceDate ?? "");
+  const [remark, setRemark] = useState(initialNotes ?? "");
   const [locked, setLocked] = useState(initialLocked);
   const [editingInProgress, setEditingInProgress] = useState(!initialLocked);
   const [saving, setSaving] = useState(false);
@@ -69,6 +72,7 @@ export function PurchaseDetailClient({
     setSupplierId(initialSupplierId);
     setInvoiceRef(initialInvoiceRef ?? "");
     setInvoiceDate(initialInvoiceDate ?? "");
+    setRemark(initialNotes ?? "");
     setErr(null);
     setMsg(null);
   }, [
@@ -77,6 +81,7 @@ export function PurchaseDetailClient({
     initialSupplierId,
     initialInvoiceRef,
     initialInvoiceDate,
+    initialNotes,
   ]);
 
   useEffect(() => {
@@ -116,6 +121,7 @@ export function PurchaseDetailClient({
         supplierId,
         invoiceRef: invoiceRef.trim() || null,
         invoiceDate: invoiceDate.trim() || null,
+        notes: remark.trim() || null,
       };
       if (!editingInProgress) {
         body.complete = true;
@@ -146,6 +152,7 @@ export function PurchaseDetailClient({
     supplierId,
     invoiceRef,
     invoiceDate,
+    remark,
     editingInProgress,
     router,
   ]);
@@ -235,6 +242,20 @@ export function PurchaseDetailClient({
               />
             </label>
           </div>
+          <label className="text-sm">
+            <span className="text-zinc-500">Remark</span>
+            <textarea
+              className={fieldCls}
+              rows={2}
+              maxLength={2000}
+              value={remark}
+              disabled={fieldsDisabled}
+              onChange={(e) => {
+                clearFeedback();
+                setRemark(e.target.value);
+              }}
+            />
+          </label>
         </div>
       </div>
 

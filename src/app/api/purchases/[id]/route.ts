@@ -13,7 +13,7 @@ const patchSchema = z
     invoiceRef: z.union([z.string(), z.null()]).optional(),
     /** yyyy-mm-dd or null to clear */
     invoiceDate: z.union([z.string(), z.null()]).optional(),
-    notes: z.union([z.string(), z.null()]).optional(),
+    notes: z.union([z.string().max(2000), z.null()]).optional(),
     /** true = finalize purchase (view only); cannot be set back to false via API */
     complete: z.boolean().optional(),
   })

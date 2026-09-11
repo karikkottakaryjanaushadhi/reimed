@@ -96,7 +96,7 @@ const bodySchema = z.object({
   invoiceRef: z.string().optional(),
   /** yyyy-mm-dd (required) */
   invoiceDate: z.string().refine((s) => s.trim().length > 0, { message: "Invoice date is required" }),
-  notes: z.string().optional(),
+  notes: z.string().max(2000).optional(),
   /** When true, purchase is finalized immediately (view only on detail page). Default false (still editing). */
   complete: z.boolean().optional(),
   paymentMode: z.enum(["CASH", "CARD", "UPI", "CREDIT"]).optional(),

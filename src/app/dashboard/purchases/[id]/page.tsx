@@ -154,6 +154,10 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
             <dt className="text-zinc-500">Invoice date</dt>
             <dd>{purchase.invoiceDate ? format(purchase.invoiceDate, "dd MMM yyyy") : "—"}</dd>
           </div>
+          <div className="sm:col-span-2">
+            <dt className="text-zinc-500">Remark</dt>
+            <dd className="whitespace-pre-wrap">{purchase.notes?.trim() || "—"}</dd>
+          </div>
           <div>
             <dt className="text-zinc-500">Approx. total (incl. GST)</dt>
             <dd className="tabular-nums">
@@ -207,12 +211,6 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
               {due === 0 ? "—" : due > 0 ? `₹${due.toFixed(2)} due` : `₹${Math.abs(due).toFixed(2)} credit`}
             </dd>
           </div>
-          {purchase.notes?.trim() ? (
-            <div className="sm:col-span-2">
-              <dt className="text-zinc-500">Notes</dt>
-              <dd className="whitespace-pre-wrap">{purchase.notes.trim()}</dd>
-            </div>
-          ) : null}
         </dl>
 
         <div className="mt-4">
@@ -234,6 +232,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
             initialSupplierName={purchase.supplier.name}
             initialInvoiceRef={purchase.invoiceRef}
             initialInvoiceDate={invDateStr || null}
+            initialNotes={purchase.notes}
             initialLocked={viewOnly}
             lines={lineDrafts}
           />

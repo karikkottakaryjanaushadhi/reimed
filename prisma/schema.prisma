@@ -171,6 +171,7 @@ model Purchase {
   supplierId  String
   invoiceRef  String?
   invoiceDate DateTime?
+  /// Optional bill remark (also filled from invoice import metadata).
   notes       String?
   /// When true, purchase is finalized — supplier/invoice/notes and lines are view only (no API re-open).
   complete    Boolean        @default(false)
