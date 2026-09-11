@@ -7,12 +7,13 @@ import { DateRangePickerFields } from "@/components/date-range-picker-fields";
 import { FilterOptionsCombobox } from "@/components/filter-options-combobox";
 import { readFormParams, useCascadingFilterOptions } from "@/components/use-cascading-filter-options";
 
-const FILTER_FIELDS = ["from", "to", "doctor", "patient", "product", "unpaid"] as const;
+const FILTER_FIELDS = ["from", "to", "billNo", "doctor", "patient", "product", "unpaid"] as const;
 
 export function SalesFilterForm({
   actionPath,
   from,
   to,
+  billNo,
   doctor,
   patient,
   product,
@@ -25,6 +26,7 @@ export function SalesFilterForm({
   actionPath: string;
   from: string;
   to: string;
+  billNo: string;
   doctor: string;
   patient: string;
   product: string;
@@ -55,7 +57,7 @@ export function SalesFilterForm({
       ref={formRef}
       method="get"
       action={actionPath}
-      className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-[repeat(5,minmax(0,1fr))_auto]"
+      className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-[repeat(6,minmax(0,1fr))_auto]"
     >
       {hiddenLimit ? <input type="hidden" name="limit" value={hiddenLimit} /> : null}
 
@@ -65,6 +67,21 @@ export function SalesFilterForm({
         onChange={refresh}
         inputClassName="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
       />
+
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Bill #</span>
+        <input
+          name="billNo"
+          type="search"
+          defaultValue={billNo}
+          onChange={refresh}
+          placeholder="Bill number"
+          autoComplete="off"
+          inputMode="numeric"
+          aria-label="Bill number"
+          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-brand-blue-light dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+        />
+      </label>
 
       <label className="flex flex-col gap-1">
         <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Doctor</span>

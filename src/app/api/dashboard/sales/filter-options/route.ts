@@ -11,6 +11,7 @@ export async function GET(req: Request) {
     storeId: ctx.activeStoreId,
     from: searchParams.get("from") ?? undefined,
     to: searchParams.get("to") ?? undefined,
+    billNo: searchParams.get("billNo") ?? undefined,
     doctor: searchParams.get("doctor") ?? undefined,
     patient: searchParams.get("patient") ?? undefined,
     product: searchParams.get("product") ?? undefined,

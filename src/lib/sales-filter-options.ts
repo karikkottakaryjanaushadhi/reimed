@@ -7,6 +7,7 @@ export type SalesFilterParams = {
   storeId: string;
   from?: string;
   to?: string;
+  billNo?: string;
   doctor?: string;
   patient?: string;
   product?: string;
@@ -16,14 +17,54 @@ export type SalesFilterParams = {
 
 type SalesFilterExclude = "doctor" | "patient" | "product";
 
+const BILL_NO_INT_MAX = 2_147_483_647;
+
+/** Prefix ranges so "12" matches 12, 120, 1234 without CAST/LIKE on the int column. */
+function billNoPrefixRanges(raw?: string): Array<{ gte: number; lte: number }> | undefined {
+  const t = raw?.trim().replace(/^#+/, "") ?? "";
+  if (!t) return undefined;
+  if (!/^\d+$/.test(t)) return [{ gte: -1, lte: -1 }];
+  const digits = t.replace(/^0+/, "") || "0";
+  const n = Number(digits);
+  if (!Number.isSafeInteger(n) || n < 0) return [{ gte: -1, lte: -1 }];
+  const ranges: Array<{ gte: number; lte: number }> = [];
+  for (let extra = 0; extra <= 10 - digits.length; extra++) {
+    const factor = 10 ** extra;
+    const low = n * factor;
+    if (low > BILL_NO_INT_MAX) break;
+    ranges.push({ gte: low, lte: Math.min(low + factor - 1, BILL_NO_INT_MAX) });
+  }
+  return ranges.length > 0 ? ranges : [{ gte: -1, lte: -1 }];
+}
+
+function billNoWhere(raw?: string): Prisma.SaleWhereInput | undefined {
+  const ranges = billNoPrefixRanges(raw);
+  if (!ranges) return undefined;
+  if (ranges.length === 1) return { billNo: ranges[0] };
+  return { OR: ranges.map((billNo) => ({ billNo })) };
+}
+
+function billNoSql(column: Prisma.Sql, raw?: string): Prisma.Sql | undefined {
+  const ranges = billNoPrefixRanges(raw);
+  if (!ranges) return undefined;
+  return Prisma.sql`(${Prisma.join(
+    ranges.map((r) => Prisma.sql`(${column} >= ${r.gte} AND ${column} <= ${r.lte})`),
+    " OR ",
+  )})`;
+}
+
 export function buildSalesFilterWhere(
   params: SalesFilterParams,
   exclude?: SalesFilterExclude,
 ): Prisma.SaleWhereInput {
-  const dateFilter = createdAtDatetimeRange(params.from || undefined, params.to || undefined);
+  const billNo = billNoWhere(params.billNo);
+  const dateFilter = billNo
+    ? undefined
+    : createdAtDatetimeRange(params.from || undefined, params.to || undefined);
   const where: Prisma.SaleWhereInput = {
     storeId: params.storeId,
     ...(dateFilter ? { createdAt: dateFilter } : {}),
+    ...billNo,
   };
 
   if (exclude !== "doctor" && params.doctor?.trim()) {
@@ -47,11 +88,15 @@ export function buildSalesFilterWhere(
 }
 
 function salesFilterAndSql(params: SalesFilterParams, exclude?: SalesFilterExclude) {
-  const dateFilter = createdAtDatetimeRange(params.from || undefined, params.to || undefined);
+  const billNo = billNoSql(Prisma.sql`s."billNo"`, params.billNo);
+  const dateFilter = billNo
+    ? undefined
+    : createdAtDatetimeRange(params.from || undefined, params.to || undefined);
   const parts: Prisma.Sql[] = [
     Prisma.sql`s."storeId" = ${params.storeId}`,
     ...sqlDateTimeRangeParts(Prisma.sql`s."createdAt"`, dateFilter),
   ];
+  if (billNo) parts.push(billNo);
   if (exclude !== "doctor" && params.doctor?.trim()) {
     parts.push(Prisma.sql`s."doctorName" ILIKE ${sqlIlikePattern(params.doctor)}`);
   }
@@ -79,6 +124,7 @@ export async function getSalesFilterOptions(params: SalesFilterParams) {
       storeId: params.storeId,
       from: params.from ?? "",
       to: params.to ?? "",
+      billNo: params.billNo?.trim() ?? "",
       doctor: params.doctor?.trim() ?? "",
       patient: params.patient?.trim() ?? "",
       product: params.product?.trim() ?? "",

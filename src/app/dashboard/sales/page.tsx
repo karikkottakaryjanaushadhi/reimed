@@ -27,6 +27,7 @@ function salesExtras(
   from: string,
   to: string,
   pageSize: number,
+  billNo: string,
   doctor: string,
   patient: string,
   product: string,
@@ -37,6 +38,7 @@ function salesExtras(
   const e: Record<string, string> = {};
   if (from) e.from = from;
   if (to) e.to = to;
+  if (billNo) e.billNo = billNo;
   if (doctor) e.doctor = doctor;
   if (patient) e.patient = patient;
   if (product) e.product = product;
@@ -73,6 +75,7 @@ export default async function SalesPage({
     limit?: string;
     from?: string;
     to?: string;
+    billNo?: string;
     doctor?: string;
     patient?: string;
     product?: string;
@@ -90,6 +93,7 @@ export default async function SalesPage({
   const today = formatAppDateYmd();
   const fromRaw = typeof sp.from === "string" ? sp.from.trim() : "";
   const toRaw = typeof sp.to === "string" ? sp.to.trim() : "";
+  const billNo = typeof sp.billNo === "string" ? sp.billNo.trim() : "";
   const doctor = typeof sp.doctor === "string" ? sp.doctor.trim() : "";
   const patient = typeof sp.patient === "string" ? sp.patient.trim() : "";
   const product = typeof sp.product === "string" ? sp.product.trim() : "";
@@ -111,6 +115,7 @@ export default async function SalesPage({
     storeId: ctx.activeStoreId,
     from,
     to,
+    billNo,
     doctor,
     patient,
     product,
@@ -174,6 +179,7 @@ export default async function SalesPage({
   const clearHref = buildSimpleListUrl("/dashboard/sales", 1, pageSize, listPrefs);
   const resetTodayHref = buildSimpleListUrl("/dashboard/sales", 1, pageSize, {
     ...listPrefs,
+    ...(billNo ? { billNo } : {}),
     ...(doctor ? { doctor } : {}),
     ...(patient ? { patient } : {}),
     ...(product ? { product } : {}),
@@ -184,12 +190,13 @@ export default async function SalesPage({
 
   let activeFilterCount = 0;
   if (from !== today || to !== today) activeFilterCount += 1;
+  if (billNo) activeFilterCount += 1;
   if (doctor) activeFilterCount += 1;
   if (patient) activeFilterCount += 1;
   if (product) activeFilterCount += 1;
   if (unpaidOnly) activeFilterCount += 1;
 
-  const extras = salesExtras(from, to, pageSize, doctor, patient, product, unpaidOnly, sort, dir);
+  const extras = salesExtras(from, to, pageSize, billNo, doctor, patient, product, unpaidOnly, sort, dir);
 
   const salesCardRows: SalesListCardRow[] = sales.map((s) => {
     const gross = Number(s.total);
@@ -249,13 +256,14 @@ export default async function SalesPage({
 
       <MobileFilterSheet
         title="Filter sales"
-        description="Defaults to today. Search by doctor, patient, or product name."
+        description="Defaults to today. Search by bill number, doctor, patient, or product name. Bill # matches any date."
         activeCount={activeFilterCount}
       >
         <SalesFilterForm
           actionPath="/dashboard/sales"
           from={from}
           to={to}
+          billNo={billNo}
           doctor={doctor}
           patient={patient}
           product={product}
@@ -462,7 +470,7 @@ export default async function SalesPage({
         </table>
         {sales.length === 0 && (
           <p className="px-4 py-8 text-center text-zinc-500">
-            {from || to ? "No bills in this date range." : "No sales yet."}
+            {billNo ? "No bill matches that number." : from || to ? "No bills in this date range." : "No sales yet."}
           </p>
         )}
       </div>
