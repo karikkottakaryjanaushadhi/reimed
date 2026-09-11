@@ -14,7 +14,7 @@ import {
   buildSimpleListUrl,
   parseListLimitParam,
 } from "@/lib/list-pagination";
-import { saleCreatedOnLocalDay } from "@/lib/sale-editable";
+import { canEditSale } from "@/lib/sale-editable";
 import {
   netSaleTotal,
   returnCreditsBySaleIds,
@@ -195,7 +195,7 @@ export default async function SalesPage({
     const gross = Number(s.total);
     const returnCr = returnCreditsBySale.get(s.id) ?? 0;
     const net = netSaleTotal(gross, returnCr);
-    const canEdit = saleCreatedOnLocalDay(s.createdAt) && returnCr === 0;
+    const canEdit = canEditSale({ createdAt: s.createdAt, returnCount: returnCr > 0 ? 1 : 0 });
 
     return {
       id: s.id,
@@ -374,7 +374,7 @@ export default async function SalesPage({
               const discount = Number(s.discount);
               const returnCr = returnCreditsBySale.get(s.id) ?? 0;
               const net = netSaleTotal(gross, returnCr);
-              const canEdit = saleCreatedOnLocalDay(s.createdAt) && returnCr === 0;
+              const canEdit = canEditSale({ createdAt: s.createdAt, returnCount: returnCr > 0 ? 1 : 0 });
 
               return (
                 <tr key={s.id} className="border-t border-zinc-100 dark:border-zinc-800">

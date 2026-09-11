@@ -231,7 +231,7 @@ export async function PATCH(
     }
     if (msg === "not_editable") {
       return NextResponse.json(
-        { error: "Only today's bills with no returns can be edited" },
+        { error: "Bills with returns cannot be edited" },
         { status: 403 },
       );
     }

@@ -5,6 +5,10 @@ export function saleCreatedOnLocalDay(createdAt: Date, day: Date = new Date()): 
   return isSameAppDay(createdAt, day);
 }
 
+/** Temporary: allow editing bills from previous days. Set false to restore the same-day lock. */
+export const ALLOW_EDIT_OLD_SALES = true;
+
 export function canEditSale(input: { createdAt: Date; returnCount: number }): boolean {
-  return saleCreatedOnLocalDay(input.createdAt) && input.returnCount === 0;
+  const sameDayOk = ALLOW_EDIT_OLD_SALES || saleCreatedOnLocalDay(input.createdAt);
+  return sameDayOk && input.returnCount === 0;
 }

@@ -190,7 +190,7 @@ export function PosBillingForm({
           lines: SaleLoadLine[];
         };
         if (!sale.editable) {
-          setLoadError("Only today's bills with no returns can be edited.");
+          setLoadError("Bills with returns cannot be edited.");
           return;
         }
         setEditBillNo(sale.billNo);
