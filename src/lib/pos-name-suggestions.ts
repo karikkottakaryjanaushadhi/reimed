@@ -43,33 +43,37 @@ async function recentPatientNames(storeId: string): Promise<string[]> {
   return dedupeRecentNames(rows.map((r) => ({ name: r.customerName })));
 }
 
-async function matchingDoctorNames(storeId: string, q: string): Promise<string[]> {
+async function matchingNames(
+  storeId: string,
+  column: "doctorName" | "customerName",
+  q: string,
+): Promise<string[]> {
+  const col = column === "doctorName" ? Prisma.sql`s."doctorName"` : Prisma.sql`s."customerName"`;
+  const needle = q.trim();
   const rows = await prisma.$queryRaw<Array<{ name: string | null }>>(Prisma.sql`
-    SELECT DISTINCT s."doctorName" AS "name"
-    FROM "Sale" s
-    WHERE s."storeId" = ${storeId}
-      AND s."doctorName" IS NOT NULL
-      AND s."doctorName" ILIKE ${sqlIlikePattern(q)}
-    ORDER BY s."doctorName" ASC
+    SELECT t."name"
+    FROM (
+      SELECT DISTINCT ${col} AS "name"
+      FROM "Sale" s
+      WHERE s."storeId" = ${storeId}
+        AND ${col} IS NOT NULL
+        AND ${col} ILIKE ${sqlIlikePattern(needle)}
+    ) t
+    ORDER BY
+      CASE
+        WHEN LOWER(TRIM(t."name")) = LOWER(${needle}) THEN 0
+        WHEN t."name" ILIKE ${`${needle}%`} THEN 1
+        WHEN t."name" ILIKE ${`% ${needle}%`} THEN 2
+        ELSE 3
+      END,
+      LENGTH(t."name"),
+      t."name" ASC
     LIMIT ${POS_NAME_SUGGESTION_LIMIT}
   `);
   return rows.map((r) => r.name?.trim() ?? "").filter(Boolean);
 }
 
-async function matchingPatientNames(storeId: string, q: string): Promise<string[]> {
-  const rows = await prisma.$queryRaw<Array<{ name: string | null }>>(Prisma.sql`
-    SELECT DISTINCT s."customerName" AS "name"
-    FROM "Sale" s
-    WHERE s."storeId" = ${storeId}
-      AND s."customerName" IS NOT NULL
-      AND s."customerName" ILIKE ${sqlIlikePattern(q)}
-    ORDER BY s."customerName" ASC
-    LIMIT ${POS_NAME_SUGGESTION_LIMIT}
-  `);
-  return rows.map((r) => r.name?.trim() ?? "").filter(Boolean);
-}
-
-/** Recent or prefix-matched doctor/patient names from past bills at this store. */
+/** Recent names, or search matches ranked exact → prefix → word-start → substring. */
 export async function getPosNameSuggestions(params: {
   storeId: string;
   field: PosNameField;
@@ -82,9 +86,9 @@ export async function getPosNameSuggestions(params: {
     20_000,
     async () => {
       if (params.field === "doctor") {
-        return q ? matchingDoctorNames(params.storeId, q) : recentDoctorNames(params.storeId);
+        return q ? matchingNames(params.storeId, "doctorName", q) : recentDoctorNames(params.storeId);
       }
-      return q ? matchingPatientNames(params.storeId, q) : recentPatientNames(params.storeId);
+      return q ? matchingNames(params.storeId, "customerName", q) : recentPatientNames(params.storeId);
     },
   );
 }
