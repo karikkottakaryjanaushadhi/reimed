@@ -237,19 +237,16 @@ export function SalesFilterForm({
         </select>
       </label>
 
-      <label className="flex w-fit flex-col gap-1 self-end">
-        <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">&nbsp;</span>
-        <span className="inline-flex items-center gap-1.5 whitespace-nowrap py-2">
-          <input
-            type="checkbox"
-            name="unpaid"
-            value="1"
-            defaultChecked={unpaidOnly}
-            onChange={refresh}
-            className="h-4 w-4 shrink-0 rounded border-zinc-300 text-brand-blue focus:ring-brand-blue dark:border-zinc-600"
-          />
-          <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">Unpaid</span>
-        </span>
+      <label className="flex w-fit items-center gap-1.5 self-end whitespace-nowrap py-2">
+        <input
+          type="checkbox"
+          name="unpaid"
+          value="1"
+          defaultChecked={unpaidOnly}
+          onChange={refresh}
+          className="h-4 w-4 shrink-0 rounded border-zinc-300 text-brand-blue focus:ring-brand-blue dark:border-zinc-600"
+        />
+        <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">Unpaid</span>
       </label>
 
       <div className="col-span-full flex flex-wrap items-center gap-2 md:flex-nowrap">
