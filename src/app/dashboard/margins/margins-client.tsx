@@ -4,13 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { formatAppDateTime, formatAppDateYmd } from "@/lib/app-timezone";
 import { DEFAULT_LIST_PAGE_SIZE } from "@/lib/list-pagination";
-import type { MarginsQuery, MarginsReport } from "@/lib/margins-report";
+import { type MarginsQuery, type MarginsReport, marginsReportCacheKey } from "@/lib/margins-report-types";
 import { MobileFilterSheet } from "@/components/mobile-filter-sheet";
 import { ListPageSizeControls, ListPaginationNav } from "@/components/list-pagination";
 import { MarginGate } from "./margin-gate";
 import { MarginsFilterForm } from "./margins-filter-form";
 import { MarginsBillMobile, MarginsProductMobile } from "./margins-list-mobile";
-import { marginsReportCacheKey } from "@/lib/margins-report";
 import { buildMarginsUrl } from "./margins-url";
 import { useMarginAccess } from "./margin-access-context";
 

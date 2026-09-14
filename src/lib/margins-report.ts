@@ -1,6 +1,6 @@
 import { formatAppDateYmd } from "@/lib/app-timezone";
 import { createdAtDatetimeRange } from "@/lib/date-range-filter";
-import { DEFAULT_LIST_PAGE_SIZE, parseListLimitParam } from "@/lib/list-pagination";
+import { parseListLimitParam } from "@/lib/list-pagination";
 import {
   aggregateBillwiseMargins,
   billwiseSaleLineWhere,
@@ -11,94 +11,18 @@ import {
   productwiseSaleLineWhere,
   sumProductwiseRows,
 } from "@/lib/productwise-sales-aggregate";
+import type { MarginsQuery, MarginsReport } from "@/lib/margins-report-types";
 import { getProductwiseProductOptions } from "@/lib/sales-filter-options";
 import { prisma } from "@/lib/prisma";
 import { roundMoney } from "@/lib/sale-return-aggregates";
 
-export type MarginsQuery = {
-  page?: string;
-  limit?: string;
-  from?: string;
-  to?: string;
-  view?: string;
-  product?: string;
-  bill?: string;
-  sort?: string;
-  dir?: string;
-};
-
-export type MarginProductItem = {
-  productId: string;
-  productName: string;
-  quantity: number;
-  returnQty: number;
-  billCount: number;
-  gross: number;
-  discount: number;
-  netRevenue: number;
-  cost: number;
-  margin: number;
-  marginPercent: number;
-};
-
-export type MarginBillItem = {
-  saleId: string;
-  billNo: number;
-  createdAtIso: string;
-  customerName: string | null;
-  lineCount: number;
-  netRevenue: number;
-  cost: number;
-  margin: number;
-  marginPercent: number;
-  returnCredits: number;
-};
-
-export type MarginsReport =
-  | {
-      view: "product";
-      from: string;
-      to: string;
-      product: string;
-      sort: string;
-      dir: string;
-      page: number;
-      pageSize: number;
-      totalPages: number;
-      totalCount: number;
-      initialProducts: string[];
-      items: MarginProductItem[];
-      totals: {
-        productCount: number;
-        quantity: number;
-        gross: number;
-        netRevenue: number;
-        cost: number;
-        margin: number;
-        marginPercent: number;
-      };
-    }
-  | {
-      view: "bill";
-      from: string;
-      to: string;
-      bill: string;
-      sort: string;
-      dir: string;
-      page: number;
-      pageSize: number;
-      totalPages: number;
-      totalCount: number;
-      initialProducts: string[];
-      items: MarginBillItem[];
-      totals: {
-        billCount: number;
-        netRevenue: number;
-        cost: number;
-        margin: number;
-        marginPercent: number;
-      };
-    };
+export type {
+  MarginBillItem,
+  MarginProductItem,
+  MarginsQuery,
+  MarginsReport,
+} from "@/lib/margins-report-types";
+export { marginsReportCacheKey } from "@/lib/margins-report-types";
 
 function marginPercent(margin: number, netRevenue: number) {
   return netRevenue > 0 ? roundMoney((margin / netRevenue) * 10000) / 100 : 0;
@@ -309,18 +233,4 @@ export async function loadMarginsReport(storeId: string, sp: MarginsQuery): Prom
       marginPercent: totals.marginPercent,
     },
   };
-}
-
-export function marginsReportCacheKey(sp: MarginsQuery): string {
-  return [
-    sp.view ?? "product",
-    sp.page ?? "1",
-    sp.limit ?? String(DEFAULT_LIST_PAGE_SIZE),
-    sp.from ?? "",
-    sp.to ?? "",
-    sp.product ?? "",
-    sp.bill ?? "",
-    sp.sort ?? "",
-    sp.dir ?? "",
-  ].join("|");
 }

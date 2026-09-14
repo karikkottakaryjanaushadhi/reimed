@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAuthContext, isManager } from "@/lib/auth-context";
 import { isAdminPasswordConfigured } from "@/lib/admin-access";
-import type { MarginsQuery } from "@/lib/margins-report";
+import type { MarginsQuery } from "@/lib/margins-report-types";
 import { MarginsClient } from "./margins-client";
 
 export default async function MarginsPage({
