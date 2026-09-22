@@ -8,7 +8,7 @@ export type SaleBillLineView = {
   expiryLabel: string;
   qty: number;
   rate: number;
-  gross: number;
+  mrp: number;
   discPct: number;
   disc: number;
   mrgPct: number;
@@ -43,8 +43,8 @@ export function SaleBillLinesMobile({ lines }: { lines: SaleBillLineView[] }) {
               <dd className="tabular-nums text-zinc-800 dark:text-zinc-200">₹{line.rate.toFixed(2)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-zinc-500">MRP value</dt>
-              <dd className="tabular-nums text-zinc-800 dark:text-zinc-200">₹{line.gross.toFixed(2)}</dd>
+              <dt className="text-xs text-zinc-500">MRP</dt>
+              <dd className="tabular-nums text-zinc-800 dark:text-zinc-200">₹{line.mrp.toFixed(2)}</dd>
             </div>
             <div>
               <dt className="text-xs text-zinc-500">Disc%</dt>
@@ -96,11 +96,11 @@ export function SaleBillLinesTable({ lines }: { lines: SaleBillLineView[] }) {
             <th className="px-3 py-2">Expiry</th>
             <th className="px-3 py-2 text-right">Qty</th>
             <th className="px-3 py-2 text-right">Rate</th>
-            <th className="px-3 py-2 text-right">MRP value</th>
+            <th className="px-3 py-2 text-right">MRP</th>
             <th className="px-3 py-2 text-right">Disc%</th>
             <th className="px-3 py-2 text-right">Disc₹</th>
-            <th className="px-3 py-2 text-right">Mrg%</th>
-            <th className="px-3 py-2 text-right">GST</th>
+            <th className="px-3 py-2 text-right" title="Margin % for one pack at selling rate vs lot cost">Mrg%</th>
+            <th className="px-3 py-2 text-right" title="GST extracted from inclusive selling rate per pack">GST</th>
             <th className="px-3 py-2 text-right">Sum</th>
             <th className="px-3 py-2 text-right">Ret.</th>
           </tr>
@@ -119,7 +119,7 @@ export function SaleBillLinesTable({ lines }: { lines: SaleBillLineView[] }) {
               <td className="px-3 py-2 tabular-nums text-zinc-600 dark:text-zinc-400">{line.expiryLabel}</td>
               <td className="px-3 py-2 text-right tabular-nums">{line.qty}</td>
               <td className="px-3 py-2 text-right tabular-nums">₹{line.rate.toFixed(2)}</td>
-              <td className="px-3 py-2 text-right tabular-nums">₹{line.gross.toFixed(2)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">₹{line.mrp.toFixed(2)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-zinc-600">
                 {line.discPct > 0 ? `${line.discPct.toFixed(2)}%` : "—"}
               </td>

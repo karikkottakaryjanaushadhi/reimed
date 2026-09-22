@@ -8,7 +8,9 @@ import { canEditSale } from "@/lib/sale-editable";
 import { saleBillRoundOff, salePayableFromLineAmounts } from "@/lib/bill-round";
 import { netSaleTotal } from "@/lib/sale-return-aggregates";
 import { saleLinePackSize } from "@/lib/inventory-lot-pack-size";
-import { saleLineMarginPercent } from "@/lib/sale-line";
+import { inventoryLotMarginPercent } from "@/lib/inventory-lot-margin";
+import { saleDiscountFromMrpRate } from "@/lib/inventory-lot-pricing";
+import { saleLineGstPerPack, saleLinePackRateFromGross } from "@/lib/sale-line";
 import { prisma } from "@/lib/prisma";
 import {
   SaleBillLinesMobile,
@@ -87,17 +89,13 @@ export default async function SaleBillViewPage({ params }: { params: Promise<{ i
     const gross = Number(line.amount);
     const discPct = Number(line.discountPct);
     const disc = Number(line.discountAmount);
-    const gst = Number(line.gstAmount);
     const lineIncl = Math.round((gross - disc) * 100) / 100;
     const packSize = saleLinePackSize(line);
-    const mrgPct = saleLineMarginPercent(
-      gross,
-      disc,
-      gst,
-      line.qty,
-      Number(line.lot.costPrice),
-      packSize,
-    );
+    const rate = Number(line.rate);
+    const mrp = saleLinePackRateFromGross(line.qty, gross, packSize);
+    const gstPct = Number(line.gstPct);
+    const mrgPct =
+      inventoryLotMarginPercent(Number(line.lot.costPrice), mrp, rate, packSize, gstPct) ?? 0;
     return {
       id: line.id,
       productName: line.product.name,
@@ -107,12 +105,12 @@ export default async function SaleBillViewPage({ params }: { params: Promise<{ i
       batchNo: line.lot.batchNo,
       expiryLabel: format(line.lot.expiryDate, "MM/yyyy"),
       qty: line.qty,
-      rate: Number(line.rate),
-      gross,
+      rate,
+      mrp,
       discPct,
-      disc,
+      disc: saleDiscountFromMrpRate(mrp, rate).rs,
       mrgPct,
-      gst,
+      gst: saleLineGstPerPack(rate, gstPct),
       lineIncl,
       returnedQty,
     };

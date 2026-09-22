@@ -14,7 +14,8 @@ import {
 import { createPortal } from "react-dom";
 import { NumericTableInput } from "@/components/numeric-table-input";
 import { computePosSaleLineMoney } from "@/lib/sale-checkout-resolve";
-import { saleLineMarginPercent } from "@/lib/sale-line";
+import { inventoryLotMarginPercent } from "@/lib/inventory-lot-margin";
+import { saleLineGstPerPack } from "@/lib/sale-line";
 import { floatingDropdownMaxHeight } from "@/lib/floating-dropdown";
 import { drugCodeMatchesQuery, displayDrugCode } from "@/lib/drug-code";
 import { nameMatchesLooseQuery, sortByProductSearchRelevance } from "@/lib/search-normalize";
@@ -30,10 +31,10 @@ import {
   effectiveLineDiscountPct,
   formatLotExpiry,
   nominalDiscountPctFromLot,
-  round2,
   scrollChildIntoViewContainer,
   posRateMrpBracketLabel,
   posRateMrpBracketRangeLabel,
+  posDiscountRsPerPack,
   posStockAvailabilityClass,
   posStockAvailabilityLabel,
   syncMrpDiscountFields,
@@ -414,11 +415,7 @@ export function useDraftLine({
   function setDraftLineGross(raw: number) {
     const lot = selectedLot();
     if (!lot) return;
-    let gross = Number(raw);
-    if (!Number.isFinite(gross) || gross < 0) gross = 0;
-    const qn = Math.max(1, qty);
-    const ps = lotBillingPackSize(lot);
-    const synced = syncMrpDiscountFields(lot.mrp, round2((gross * ps) / qn));
+    const synced = syncMrpDiscountFields(lot.mrp, raw);
     setRate(synced.rate);
     setDiscountFromLotOnly(true);
     setDiscountPct(synced.discountPct);
@@ -436,12 +433,7 @@ export function useDraftLine({
   function setDraftDiscountFromAmount(raw: number) {
     const lot = selectedLot();
     if (!lot) return;
-    const { rate, discountPct } = applyMrpDiscountAmountToLine(
-      qty,
-      lot.mrp,
-      lotBillingPackSize(lot),
-      raw,
-    );
+    const { rate, discountPct } = applyMrpDiscountAmountToLine(lot.mrp, raw);
     setRate(rate);
     setDiscountFromLotOnly(true);
     setDiscountPct(discountPct);
@@ -614,18 +606,16 @@ export function useDraftLine({
         gstPct: draftGstPct ?? 0,
       })
     : null;
-  const previewDiscRs = preview?.discountAmount ?? 0;
-  const previewMarginPct =
-    preview && lot
-      ? saleLineMarginPercent(
-          preview.amount,
-          preview.discountAmount,
-          preview.gstAmount,
-          qty,
-          lot.costPrice,
-          lotBillingPackSize(lot),
-        )
-      : null;
+  const previewDiscRs = lot ? posDiscountRsPerPack(lot.mrp, rate) : 0;
+  const previewMarginPct = lot
+    ? inventoryLotMarginPercent(
+        lot.costPrice,
+        lot.mrp,
+        rate,
+        lotBillingPackSize(lot),
+        draftGstPct ?? 0,
+      )
+    : null;
   const addDisabled = !lot || lot.expired || lotAvailableQty < 1 || qty < 1 || qty > lotAvailableQty;
 
   return {
@@ -639,6 +629,7 @@ export function useDraftLine({
     lotAvailableQtyFor: (l: Lot) => availableLotQty(l.quantity, cart, l.id),
     lotId,
     qty,
+    rate,
     setQty,
     setQtyFromInput,
     commitQty,
@@ -1038,7 +1029,7 @@ export function DraftLinePortals({ draft }: { draft: DraftLineState }) {
 }
 
 export function DraftLineMobileCard({ draft }: { draft: DraftLineState }) {
-  const { lot, preview, previewDiscRs, previewMarginPct } = draft;
+  const { lot, preview, previewDiscRs, previewMarginPct, rate } = draft;
 
   return (
     <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/30 p-4 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20">
@@ -1115,8 +1106,9 @@ export function DraftLineMobileCard({ draft }: { draft: DraftLineState }) {
             <NumericTableInput
               min={0}
               step={0.01}
+              title="Selling rate per pack (GST-inclusive), same pack as MRP"
               className={`mt-1 w-full ${POS_FIELD_INPUT_CLASS} text-right font-medium`}
-              value={preview?.grossRate ?? 0}
+              value={rate}
               onChange={draft.setDraftLineGross}
               onKeyDown={draft.onCommitKeyDown}
             />
@@ -1137,8 +1129,9 @@ export function DraftLineMobileCard({ draft }: { draft: DraftLineState }) {
             Disc ₹
             <NumericTableInput
               min={0}
-              max={preview ? Math.max(preview.amount, previewDiscRs) : 0}
+              max={lot ? Math.max(lot.mrp, previewDiscRs) : 0}
               step={0.01}
+              title="Rupee discount per pack vs MRP"
               className={`mt-1 w-full ${POS_FIELD_INPUT_CLASS} text-right`}
               value={previewDiscRs}
               onChange={draft.setDraftDiscountFromAmount}
@@ -1177,7 +1170,7 @@ export function DraftLineMobileCard({ draft }: { draft: DraftLineState }) {
 }
 
 export function DraftLineTableRow({ draft }: { draft: DraftLineState }) {
-  const { lot, preview, previewDiscRs, previewMarginPct, draftGstPct } = draft;
+  const { lot, preview, previewDiscRs, previewMarginPct, draftGstPct, rate } = draft;
 
   return (
     <tr className="bg-emerald-50/40 dark:bg-emerald-950/15">
@@ -1253,8 +1246,9 @@ export function DraftLineTableRow({ draft }: { draft: DraftLineState }) {
         <NumericTableInput
           min={0}
           step={0.01}
+          title="Selling rate per pack (GST-inclusive), same pack as MRP"
           className={`ml-auto w-full min-w-0 max-w-[5rem] text-right font-medium text-zinc-800 dark:text-zinc-200 ${POS_FIELD_INPUT_CLASS}`}
-          value={preview?.grossRate ?? 0}
+          value={rate}
           disabled={!lot}
           onChange={draft.setDraftLineGross}
           onKeyDown={draft.onCommitKeyDown}
@@ -1275,8 +1269,9 @@ export function DraftLineTableRow({ draft }: { draft: DraftLineState }) {
       <td className="px-1 py-2 align-middle text-right">
         <NumericTableInput
           min={0}
-          max={preview ? Math.max(preview.amount, previewDiscRs) : 0}
+          max={lot ? Math.max(lot.mrp, previewDiscRs) : 0}
           step={0.01}
+          title="Rupee discount per pack vs MRP"
           className={`ml-auto w-full min-w-0 max-w-[4rem] text-right ${POS_FIELD_INPUT_CLASS}`}
           value={previewDiscRs}
           disabled={!lot}
@@ -1291,7 +1286,7 @@ export function DraftLineTableRow({ draft }: { draft: DraftLineState }) {
         {draftGstPct == null ? "—" : `${draftGstPct}%`}
       </td>
       <td className="px-1 py-2 align-middle text-right tabular-nums text-zinc-600 dark:text-zinc-400">
-        {preview ? `₹${preview.gstAmount.toFixed(2)}` : "—"}
+        {lot && draftGstPct != null ? `₹${saleLineGstPerPack(rate, draftGstPct).toFixed(2)}` : "—"}
       </td>
       <td className="px-1 py-2 align-middle text-right tabular-nums font-medium text-zinc-800 dark:text-zinc-200">
         {preview ? `₹${preview.lineInclusiveTotal.toFixed(2)}` : "—"}

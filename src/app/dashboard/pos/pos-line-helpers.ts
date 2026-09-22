@@ -1,5 +1,4 @@
 import { formatAppDateShortDmy } from "@/lib/app-timezone";
-import { computePosSaleLineMoney } from "@/lib/sale-checkout-resolve";
 import { saleDiscountFromMrpRate, saleRateFromMrpDiscountPct } from "@/lib/inventory-lot-pricing";
 import { saleLineGrossAmount, splitInclusiveGst } from "@/lib/sale-line";
 import type { CartLine, Lot } from "./cart-types";
@@ -109,29 +108,30 @@ export function applyMrpDiscountPctToLine(mrp: number, rawPct: number): { rate: 
   return { rate: saleRateFromMrpDiscountPct(mrp, p), discountPct: p };
 }
 
-/** Apply total line discount amount vs MRP gross (Disc ₹ column). Updates selling rate. */
+/** Apply rupee discount per pack vs printed MRP (Disc ₹ column, same unit as MRP). Updates selling rate. */
 export function applyMrpDiscountAmountToLine(
-  qty: number,
   mrp: number,
-  packSize: number,
-  lineDiscountAmount: number,
+  packDiscountAmount: number,
 ): { rate: number; discountPct: number } {
-  const ps = Math.max(1, Math.trunc(packSize) || 1);
-  const q = Math.max(1, qty);
-  const grossMrp = saleLineGrossAmount(q, mrp, ps);
-  let amt = Number(lineDiscountAmount);
+  let amt = Number(packDiscountAmount);
   if (!Number.isFinite(amt) || amt < 0) amt = 0;
-  const cap = round2(grossMrp);
+  const cap = round2(Math.max(0, Number.isFinite(mrp) ? mrp : 0));
   if (amt > cap) amt = cap;
-  const lineInclusive = round2(grossMrp - amt);
-  const rate = round2((lineInclusive * ps) / q);
+  const rate = round2(Math.max(0, cap - amt));
   const { pct } = saleDiscountFromMrpRate(mrp, rate);
   return { rate, discountPct: pct };
 }
 
-/** Keep Disc% aligned when selling rate is edited directly (e.g. Amount column). */
+/** Disc ₹ shown on POS — rupees off printed MRP per pack. */
+export function posDiscountRsPerPack(mrp: number, rate: number): number {
+  return saleDiscountFromMrpRate(mrp, rate).rs;
+}
+
+/** Keep Disc% aligned when selling rate per pack is edited (Amount column, same unit as MRP). */
 export function syncMrpDiscountFields(mrp: number, rate: number): { rate: number; discountPct: number } {
-  const r = round2(rate);
+  let r = Number(rate);
+  if (!Number.isFinite(r) || r < 0) r = 0;
+  r = round2(r);
   return { rate: r, discountPct: saleDiscountFromMrpRate(mrp, r).pct };
 }
 
@@ -167,26 +167,6 @@ export function lineFinancials(
     gstAmount,
     lineInclusiveTotal: inclusiveAfterDiscount,
   };
-}
-
-export function posDiscountRupeeDisplay(
-  qty: number,
-  rate: number,
-  mrp: number,
-  packSize: number,
-  discountPct: number,
-  discountFromLotOnly: boolean | undefined,
-  gstPct: number = 0,
-): number {
-  const eff = effectiveLineDiscountPct(rate, mrp, discountPct, discountFromLotOnly);
-  return computePosSaleLineMoney({
-    qty,
-    rate,
-    mrp,
-    packSize,
-    discountPctOffRate: eff,
-    gstPct,
-  }).discountAmount;
 }
 
 /** Recover POS Disc% off MRP from a saved sale line for edit mode. */

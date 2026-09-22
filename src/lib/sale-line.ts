@@ -9,6 +9,13 @@ export function saleLineGrossAmount(qty: number, rate: number, packSize: number)
   return Math.round(((qty * rate) / ps) * 100) / 100;
 }
 
+/** Inverse of `saleLineGrossAmount` — pack MRP/rate from a stored line gross. */
+export function saleLinePackRateFromGross(qty: number, lineGross: number, packSize: number): number {
+  const ps = Math.max(1, Math.trunc(packSize) || 1);
+  const q = Math.max(1, Math.trunc(qty) || 1);
+  return Math.round(((lineGross * ps) / q) * 100) / 100;
+}
+
 export function saleLineCostAmount(qty: number, costPrice: number, packSize: number): number {
   return saleLineGrossAmount(qty, costPrice, packSize);
 }
@@ -47,6 +54,11 @@ export function splitInclusiveGst(
   const gstAmount = Math.round(((inc * gstPct) / (100 + gstPct)) * 100) / 100;
   const netExclusive = Math.round((inc - gstAmount) * 100) / 100;
   return { gstAmount, netExclusive };
+}
+
+/** GST extracted from GST-inclusive selling rate per pack (same unit as MRP / Amount). */
+export function saleLineGstPerPack(ratePerPack: number, gstPct: number): number {
+  return splitInclusiveGst(ratePerPack, gstPct).gstAmount;
 }
 
 /** Recompute POS line money fields when only qty / discount % change (rate & GST % fixed). */

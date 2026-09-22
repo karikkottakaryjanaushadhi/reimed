@@ -14,7 +14,8 @@ import { NumericTableInput } from "@/components/numeric-table-input";
 import { roundBillGrandTotal } from "@/lib/bill-round";
 import { defaultSalePaid } from "@/lib/sale-paid";
 import { computePosSaleLineMoney } from "@/lib/sale-checkout-resolve";
-import { saleLineMarginPercent } from "@/lib/sale-line";
+import { inventoryLotMarginPercent } from "@/lib/inventory-lot-margin";
+import { saleLineGstPerPack } from "@/lib/sale-line";
 import {
   isPlaceholderCustomerName,
   isPlaceholderDoctorName,
@@ -26,6 +27,7 @@ import {
   discountPctOffMrpFromSavedLine,
   effectiveLineDiscountPct,
   formatLotExpiry,
+  posDiscountRsPerPack,
   round2,
   syncMrpDiscountFields,
 } from "./pos-line-helpers";
@@ -263,17 +265,12 @@ export function PosBillingForm({
     setSavedBill(null);
   }
 
-  /** Line gross before discount; updates implied rate for API */
+  /** Selling rate per pack (same unit as MRP). */
   function updateCartLineGross(lotId: string, raw: number) {
     setCart((c) =>
       c.map((line) => {
         if (line.lotId !== lotId) return line;
-        let gross = Number(raw);
-        if (!Number.isFinite(gross) || gross < 0) gross = 0;
-        const q = Math.max(1, line.qty);
-        const ps = Math.max(1, Math.trunc(line.packSize) || 1);
-        const rate = round2((gross * ps) / q);
-        const synced = syncMrpDiscountFields(line.mrp, rate < 0 ? 0 : rate);
+        const synced = syncMrpDiscountFields(line.mrp, raw);
         return { ...line, ...synced, discountFromLotOnly: true };
       }),
     );
@@ -329,12 +326,7 @@ export function PosBillingForm({
     setCart((c) =>
       c.map((line) => {
         if (line.lotId !== lotId) return line;
-        const { rate, discountPct } = applyMrpDiscountAmountToLine(
-          line.qty,
-          line.mrp,
-          line.packSize,
-          raw,
-        );
+        const { rate, discountPct } = applyMrpDiscountAmountToLine(line.mrp, raw);
         return { ...line, rate, discountPct, discountFromLotOnly: true };
       }),
     );
@@ -534,14 +526,13 @@ export function PosBillingForm({
               discountPctOffRate: eff,
               gstPct,
             });
-            const discRsDisplay = m.discountAmount;
-            const marginPct = saleLineMarginPercent(
-              m.amount,
-              m.discountAmount,
-              m.gstAmount,
-              l.qty,
+            const discRsDisplay = posDiscountRsPerPack(l.mrp, l.rate);
+            const marginPct = inventoryLotMarginPercent(
               l.costPrice ?? 0,
+              l.mrp,
+              l.rate,
               l.packSize,
+              gstPct,
             );
             return (
               <div
@@ -587,8 +578,9 @@ export function PosBillingForm({
                     <NumericTableInput
                       min={0}
                       step={0.01}
+                      title="Selling rate per pack (GST-inclusive), same pack as MRP"
                       className={`mt-1 w-full ${POS_FIELD_INPUT_CLASS} text-right font-medium`}
-                      value={m.grossRate}
+                      value={l.rate}
                       onChange={(n) => updateCartLineGross(l.lotId, n)}
                     />
                   </label>
@@ -607,8 +599,9 @@ export function PosBillingForm({
                     Disc ₹
                     <NumericTableInput
                       min={0}
-                      max={Math.max(m.amount, discRsDisplay)}
+                      max={Math.max(l.mrp, discRsDisplay)}
                       step={0.01}
+                      title="Rupee discount per pack vs MRP"
                       className={`mt-1 w-full ${POS_FIELD_INPUT_CLASS} text-right`}
                       value={discRsDisplay}
                       onChange={(n) => updateCartDiscountAmount(l.lotId, n)}
@@ -617,7 +610,7 @@ export function PosBillingForm({
                   <label className="block text-xs text-zinc-500">
                     Mrg%
                     <div className="mt-1 rounded border border-transparent py-2 text-right text-base tabular-nums text-zinc-800 md:py-1 md:text-sm dark:text-zinc-200">
-                      {marginPct.toFixed(1)}%
+                      {marginPct == null ? "—" : `${marginPct.toFixed(1)}%`}
                     </div>
                   </label>
                   <div className="col-span-2 flex justify-between border-t border-zinc-100 pt-3 text-sm dark:border-zinc-800">
@@ -673,16 +666,18 @@ export function PosBillingForm({
               <th className="align-middle px-1 py-2 text-right" title="Printed MRP per pack from batch">
                 MRP
               </th>
-              <th className="align-middle px-1 py-2 text-right" title="Gross line amount before discount; rate is GST-inclusive (MRP-style) per pack.">
+              <th className="align-middle px-1 py-2 text-right" title="Selling rate per pack (GST-inclusive), same pack as MRP. Line total is Sum.">
                 Amount
               </th>
               <th className="align-middle px-1 py-2 text-right" title="Discount %">
                 Disc%
               </th>
-              <th className="align-middle px-1 py-2 text-right">Disc₹</th>
+              <th className="align-middle px-1 py-2 text-right" title="Rupee discount per pack vs printed MRP (same pack as Amount).">
+                Disc₹
+              </th>
               <th
                 className="align-middle px-1 py-2 text-right"
-                title="Mrg % = (gross − discount − GST − cost) ÷ (gross − discount), using lot cost."
+                title="Margin % for one pack at selling rate vs lot cost (does not change with qty)."
               >
                 Mrg%
               </th>
@@ -694,7 +689,7 @@ export function PosBillingForm({
               </th>
               <th
                 className="align-middle px-1 py-2 text-right"
-                title="GST extracted from inclusive amount after discount; bill total = sum of this column."
+                title="GST extracted from inclusive selling rate per pack (same pack as Amount). Line GST is in the bill total."
               >
                 Gst₹
               </th>
@@ -719,14 +714,13 @@ export function PosBillingForm({
                 discountPctOffRate: eff,
                 gstPct,
               });
-              const discRsDisplay = m.discountAmount;
-              const marginPct = saleLineMarginPercent(
-                m.amount,
-                m.discountAmount,
-                m.gstAmount,
-                l.qty,
+              const discRsDisplay = posDiscountRsPerPack(l.mrp, l.rate);
+              const marginPct = inventoryLotMarginPercent(
                 l.costPrice ?? 0,
+                l.mrp,
+                l.rate,
                 l.packSize,
+                gstPct,
               );
               return (
                 <tr key={l.lotId} className="hidden bg-white md:table-row dark:bg-zinc-900/50">
@@ -766,9 +760,9 @@ export function PosBillingForm({
                     <NumericTableInput
                       min={0}
                       step={0.01}
-                      title="Gross before discount (GST-inclusive per pack)"
+                      title="Selling rate per pack (GST-inclusive), same pack as MRP"
                       className={`ml-auto w-full min-w-0 max-w-[5rem] text-right font-medium text-zinc-900 dark:text-zinc-50 ${POS_FIELD_INPUT_CLASS}`}
-                      value={m.grossRate}
+                      value={l.rate}
                       onChange={(n) => updateCartLineGross(l.lotId, n)}
                     />
                   </td>
@@ -785,22 +779,22 @@ export function PosBillingForm({
                   <td className="px-1 py-2 align-middle text-right">
                     <NumericTableInput
                       min={0}
-                      max={Math.max(m.amount, discRsDisplay)}
+                      max={Math.max(l.mrp, discRsDisplay)}
                       step={0.01}
-                      title="Discount amount (updates %)"
+                      title="Rupee discount per pack vs MRP"
                       className={`ml-auto w-full min-w-0 max-w-[4rem] text-right ${POS_FIELD_INPUT_CLASS}`}
                       value={discRsDisplay}
                       onChange={(n) => updateCartDiscountAmount(l.lotId, n)}
                     />
                   </td>
                   <td className="px-1 py-2 align-middle text-right tabular-nums text-zinc-600 dark:text-zinc-400">
-                    {marginPct.toFixed(1)}%
+                    {marginPct == null ? "—" : `${marginPct.toFixed(1)}%`}
                   </td>
                   <td className="px-1 py-2 align-middle text-right tabular-nums text-zinc-600 dark:text-zinc-300">
                     {gstPct}%
                   </td>
                   <td className="px-1 py-2 align-middle text-right tabular-nums text-zinc-600 dark:text-zinc-400">
-                    ₹{m.gstAmount.toFixed(2)}
+                    ₹{saleLineGstPerPack(l.rate, gstPct).toFixed(2)}
                   </td>
                   <td className="px-1 py-2 align-middle text-right tabular-nums font-medium text-zinc-800 dark:text-zinc-200">
                     ₹{m.lineInclusiveTotal.toFixed(2)}
