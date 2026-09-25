@@ -127,7 +127,7 @@ export function posDiscountRsPerPack(mrp: number, rate: number): number {
   return saleDiscountFromMrpRate(mrp, rate).rs;
 }
 
-/** Keep Disc% aligned when selling rate per pack is edited (Amount column, same unit as MRP). */
+/** Keep Disc% aligned when selling rate per pack is edited (Rate column, same unit as MRP). */
 export function syncMrpDiscountFields(mrp: number, rate: number): { rate: number; discountPct: number } {
   let r = Number(rate);
   if (!Number.isFinite(r) || r < 0) r = 0;

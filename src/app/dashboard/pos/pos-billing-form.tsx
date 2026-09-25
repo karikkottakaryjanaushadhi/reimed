@@ -574,7 +574,7 @@ export function PosBillingForm({
                     </div>
                   </label>
                   <label className="block text-xs text-zinc-500">
-                    Amount
+                    Rate
                     <NumericTableInput
                       min={0}
                       step={0.01}
@@ -667,12 +667,12 @@ export function PosBillingForm({
                 MRP
               </th>
               <th className="align-middle px-1 py-2 text-right" title="Selling rate per pack (GST-inclusive), same pack as MRP. Line total is Sum.">
-                Amount
+                Rate
               </th>
               <th className="align-middle px-1 py-2 text-right" title="Discount %">
                 Disc%
               </th>
-              <th className="align-middle px-1 py-2 text-right" title="Rupee discount per pack vs printed MRP (same pack as Amount).">
+              <th className="align-middle px-1 py-2 text-right" title="Rupee discount per pack vs printed MRP (same pack as Rate).">
                 Disc₹
               </th>
               <th
@@ -689,7 +689,7 @@ export function PosBillingForm({
               </th>
               <th
                 className="align-middle px-1 py-2 text-right"
-                title="GST extracted from inclusive selling rate per pack (same pack as Amount). Line GST is in the bill total."
+                title="GST extracted from inclusive selling rate per pack (same pack as Rate). Line GST is in the bill total."
               >
                 Gst₹
               </th>

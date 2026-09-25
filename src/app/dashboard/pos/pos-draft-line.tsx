@@ -1102,7 +1102,7 @@ export function DraftLineMobileCard({ draft }: { draft: DraftLineState }) {
             </div>
           </label>
           <label className="block text-xs text-zinc-500">
-            Amount
+            Rate
             <NumericTableInput
               min={0}
               step={0.01}
