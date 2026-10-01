@@ -3,8 +3,10 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getAuthContext, isManager } from "@/lib/auth-context";
 import { prisma } from "@/lib/prisma";
+import { DUPLICATE_SUPPLIER_NAME_ERROR, findSupplierIdByName } from "@/lib/catalog-name-unique";
+import { normalizeProductName } from "@/lib/product-name";
 import { compactSearchKey } from "@/lib/search-normalize";
-import { normalizeStoreEmail, storeUpper, storeUpperOpt } from "@/lib/store-text";
+import { normalizeStoreEmail, storeUpperOpt } from "@/lib/store-text";
 
 export async function GET(req: Request) {
   const ctx = await getAuthContext();
@@ -64,9 +66,15 @@ export async function POST(req: Request) {
   const parsed = createSchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
+  const name = normalizeProductName(parsed.data.name);
+  if (!name) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  if (await findSupplierIdByName(prisma, name)) {
+    return NextResponse.json({ error: DUPLICATE_SUPPLIER_NAME_ERROR }, { status: 409 });
+  }
+
   const s = await prisma.supplier.create({
     data: {
-      name: storeUpper(parsed.data.name),
+      name,
       phone: storeUpperOpt(parsed.data.phone),
       phoneAlt: storeUpperOpt(parsed.data.phoneAlt),
       email: normalizeStoreEmail(parsed.data.email || undefined),

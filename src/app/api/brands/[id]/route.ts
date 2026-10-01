@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthContext, isManager } from "@/lib/auth-context";
 import { prisma } from "@/lib/prisma";
-import { storeUpper } from "@/lib/store-text";
+import { DUPLICATE_BRAND_NAME_ERROR, findBrandIdByName } from "@/lib/catalog-name-unique";
+import { normalizeProductName } from "@/lib/product-name";
 
 const updateSchema = z.object({
   name: z.string().min(1),
@@ -24,12 +25,16 @@ export async function PATCH(
   const existing = await prisma.brand.findUnique({ where: { id }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const name = storeUpper(parsed.data.name);
+  const name = normalizeProductName(parsed.data.name);
+  if (!name) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  if (await findBrandIdByName(prisma, name, id)) {
+    return NextResponse.json({ error: DUPLICATE_BRAND_NAME_ERROR }, { status: 409 });
+  }
   try {
     const brand = await prisma.brand.update({ where: { id }, data: { name } });
     return NextResponse.json({ brand });
   } catch {
-    return NextResponse.json({ error: "A brand with this name already exists" }, { status: 409 });
+    return NextResponse.json({ error: DUPLICATE_BRAND_NAME_ERROR }, { status: 409 });
   }
 }
 

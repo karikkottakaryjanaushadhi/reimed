@@ -12,6 +12,7 @@ import { isProductSchedule } from "@/lib/product-schedules";
 import { normalizeInventoryLotExpiryDate } from "@/lib/inventory-lot-expiry";
 import { lotSalePricingFromPurchaseLine } from "@/lib/inventory-lot-pricing";
 import { upsertInventoryLotStockFromPurchase } from "@/lib/inventory-lot-upsert";
+import { resolveBrandId } from "@/lib/catalog-name-unique";
 import { normalizeProductName } from "@/lib/product-name";
 import { assertProductNameAvailable, DuplicateProductNameError } from "@/lib/product-name-unique";
 import { storeUpper, storeUpperNull, storeUpperOpt } from "@/lib/store-text";
@@ -122,13 +123,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           brandId = br?.id ?? null;
         }
         if (!brandId && np.brand?.trim()) {
-          const brandName = storeUpper(np.brand);
-          const b = await tx.brand.upsert({
-            where: { name: brandName },
-            create: { name: brandName },
-            update: {},
-          });
-          brandId = b.id;
+          brandId = await resolveBrandId(tx, np.brand);
         }
         const productName = normalizeProductName(np.name);
         await assertProductNameAvailable(tx, productName);

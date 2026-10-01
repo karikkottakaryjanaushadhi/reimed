@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthContext, isManager } from "@/lib/auth-context";
 import { prisma } from "@/lib/prisma";
-import { normalizeStoreEmail, storeUpper, storeUpperOpt } from "@/lib/store-text";
+import { DUPLICATE_SUPPLIER_NAME_ERROR, findSupplierIdByName } from "@/lib/catalog-name-unique";
+import { normalizeProductName } from "@/lib/product-name";
+import { normalizeStoreEmail, storeUpperOpt } from "@/lib/store-text";
 
 const updateSchema = z.object({
   name: z.string().min(1),
@@ -34,10 +36,16 @@ export async function PATCH(
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const d = parsed.data;
+  const name = normalizeProductName(d.name);
+  if (!name) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  if (await findSupplierIdByName(prisma, name, id)) {
+    return NextResponse.json({ error: DUPLICATE_SUPPLIER_NAME_ERROR }, { status: 409 });
+  }
+
   const supplier = await prisma.supplier.update({
     where: { id },
     data: {
-      name: storeUpper(d.name),
+      name,
       phone: storeUpperOpt(d.phone),
       phoneAlt: storeUpperOpt(d.phoneAlt),
       email: normalizeStoreEmail(d.email || undefined),

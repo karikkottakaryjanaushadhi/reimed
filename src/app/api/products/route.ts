@@ -9,13 +9,14 @@ import { isProductGstSlab } from "@/lib/product-gst-slabs";
 import { isProductCategory } from "@/lib/product-categories";
 import { isProductType } from "@/lib/product-types";
 import { isProductSchedule } from "@/lib/product-schedules";
+import { resolveBrandId } from "@/lib/catalog-name-unique";
 import { normalizeProductName } from "@/lib/product-name";
 import {
   assertProductNameAvailable,
   DuplicateProductNameError,
   findProductIdByName,
 } from "@/lib/product-name-unique";
-import { storeUpper, storeUpperNull, storeUpperOpt } from "@/lib/store-text";
+import { storeUpperNull, storeUpperOpt } from "@/lib/store-text";
 
 export async function GET(req: Request) {
   const ctx = await getAuthContext();
@@ -189,13 +190,7 @@ export async function POST(req: Request) {
   } else {
     const bn = parsed.data.brandName?.trim();
     if (bn) {
-      const brandName = storeUpper(bn);
-      const b = await prisma.brand.upsert({
-        where: { name: brandName },
-        create: { name: brandName },
-        update: {},
-      });
-      resolvedBrandId = b.id;
+      resolvedBrandId = await resolveBrandId(prisma, bn);
     }
   }
 

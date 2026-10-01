@@ -3,8 +3,9 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getAuthContext, isManager } from "@/lib/auth-context";
 import { prisma } from "@/lib/prisma";
+import { DUPLICATE_BRAND_NAME_ERROR, findBrandIdByName } from "@/lib/catalog-name-unique";
+import { normalizeProductName } from "@/lib/product-name";
 import { compactSearchKey } from "@/lib/search-normalize";
-import { storeUpper } from "@/lib/store-text";
 
 export async function GET(req: Request) {
   const ctx = await getAuthContext();
@@ -51,11 +52,15 @@ export async function POST(req: Request) {
   const parsed = createSchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
-  const name = storeUpper(parsed.data.name);
+  const name = normalizeProductName(parsed.data.name);
+  if (!name) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  if (await findBrandIdByName(prisma, name)) {
+    return NextResponse.json({ error: DUPLICATE_BRAND_NAME_ERROR }, { status: 409 });
+  }
   try {
     const b = await prisma.brand.create({ data: { name } });
     return NextResponse.json({ brand: b });
   } catch {
-    return NextResponse.json({ error: "A brand with this name already exists" }, { status: 409 });
+    return NextResponse.json({ error: DUPLICATE_BRAND_NAME_ERROR }, { status: 409 });
   }
 }
