@@ -162,7 +162,7 @@ async function mergeSuppliers(groups: Array<[string, SupplierRow[]]>) {
     }
     if (!apply) continue;
     await prisma.$transaction(async (tx) => {
-      const filled: Partial<SupplierRow> = {};
+      const filled: Partial<Record<(typeof supplierTextFields)[number], string>> = {};
       for (const field of supplierTextFields) {
         if (keeper[field]?.trim()) continue;
         const value = losers.map((loser) => loser[field]?.trim()).find(Boolean);
