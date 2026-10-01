@@ -12,6 +12,8 @@ import { isProductSchedule } from "@/lib/product-schedules";
 import { normalizeInventoryLotExpiryDate } from "@/lib/inventory-lot-expiry";
 import { lotSalePricingFromPurchaseLine } from "@/lib/inventory-lot-pricing";
 import { upsertInventoryLotStockFromPurchase } from "@/lib/inventory-lot-upsert";
+import { normalizeProductName } from "@/lib/product-name";
+import { assertProductNameAvailable, DuplicateProductNameError } from "@/lib/product-name-unique";
 import { storeUpper, storeUpperNull, storeUpperOpt } from "@/lib/store-text";
 
 function apiErr(err: unknown): string {
@@ -128,6 +130,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           });
           brandId = b.id;
         }
+        const productName = normalizeProductName(np.name);
+        await assertProductNameAvailable(tx, productName);
         const { sku: initialSku, explicit: explicitSku } = resolveProductSkuFromDrugCode(
           drugCodeFromUserInput(np.drugCode, np.productCategory),
           np.productCategory,
@@ -138,7 +142,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             const created = await tx.product.create({
               data: {
                 sku,
-                name: storeUpper(np.name),
+                name: productName,
                 brandId,
                 genericName: storeUpperNull(np.genericName),
                 packSize: np.packSize ?? 1,
@@ -240,6 +244,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     return NextResponse.json({ line });
   } catch (e) {
+    if (e instanceof DuplicateProductNameError) {
+      return NextResponse.json({ error: e.message }, { status: 409 });
+    }
     const msg = e instanceof Error ? e.message : "";
     if (msg === "not_found") return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (msg === "purchase_complete") {

@@ -1579,6 +1579,9 @@ export const PurchaseLinesEditor = forwardRef<
         open={newProductModalOpen}
         onClose={() => setNewProductModalOpen(false)}
         initial={newProductModalInitial}
+        reservedNames={Object.values(draft)
+          .filter((row) => !row.productId && row.productName.trim())
+          .map((row) => row.productName)}
         onValidationError={(message) => setErr(message)}
         onApply={applyAddNewProductModal}
       />

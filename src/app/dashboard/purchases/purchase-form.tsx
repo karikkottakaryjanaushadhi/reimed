@@ -2239,6 +2239,14 @@ export function PurchaseForm({ storeId }: { storeId: string }) {
           setNewProductModalLineIndex(null);
         }}
         initial={newProductModalInitial}
+        reservedNames={[
+          ...lines
+            .filter((l, i) => !l.productId && l.labelName.trim() && i !== newProductModalLineIndex)
+            .map((l) => l.labelName),
+          ...(newProductModalLineIndex !== null && draftNewProduct && draft.labelName.trim()
+            ? [draft.labelName]
+            : []),
+        ]}
         onValidationError={(message) => setMsg(message)}
         onApply={applyNewProductModal}
       />

@@ -9,6 +9,12 @@ import { isProductGstSlab } from "@/lib/product-gst-slabs";
 import { isProductCategory } from "@/lib/product-categories";
 import { isProductType } from "@/lib/product-types";
 import { isProductSchedule } from "@/lib/product-schedules";
+import { normalizeProductName } from "@/lib/product-name";
+import {
+  assertProductNameAvailable,
+  DuplicateProductNameError,
+  findProductIdByName,
+} from "@/lib/product-name-unique";
 import { storeUpper, storeUpperNull, storeUpperOpt } from "@/lib/store-text";
 
 export async function GET(req: Request) {
@@ -16,6 +22,12 @@ export async function GET(req: Request) {
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
+  const exactName = searchParams.get("exactName")?.trim() ?? "";
+  if (exactName) {
+    const id = await findProductIdByName(prisma, exactName);
+    return NextResponse.json({ exists: id != null });
+  }
+
   const q = searchParams.get("q")?.trim() ?? "";
   const searchSku = searchParams.get("searchSku") !== "0";
 
@@ -187,12 +199,22 @@ export async function POST(req: Request) {
     }
   }
 
+  const productName = normalizeProductName(parsed.data.name);
+  try {
+    await assertProductNameAvailable(prisma, productName);
+  } catch (e) {
+    if (e instanceof DuplicateProductNameError) {
+      return NextResponse.json({ error: e.message }, { status: 409 });
+    }
+    throw e;
+  }
+
   for (let attempt = 0; attempt < 6; attempt++) {
     try {
       const p = await prisma.product.create({
         data: {
           sku,
-          name: storeUpper(parsed.data.name),
+          name: productName,
           brandId: resolvedBrandId,
           genericName: storeUpperNull(parsed.data.genericName),
           packSize: parsed.data.packSize ?? 1,

@@ -3,6 +3,8 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { getAuthContext } from "@/lib/auth-context";
 import { prisma } from "@/lib/prisma";
+import { normalizeProductName } from "@/lib/product-name";
+import { assertProductNameAvailable, DuplicateProductNameError } from "@/lib/product-name-unique";
 import { storeUpper } from "@/lib/store-text";
 
 const patchSchema = z
@@ -77,27 +79,37 @@ export async function PATCH(
 
   const hasLotUpdates = Object.keys(lotData).length > 0;
 
-  const updated = await prisma.$transaction(async (tx) => {
-    if (d.productName !== undefined) {
-      await tx.product.update({
-        where: { id: existing.productId },
-        data: { name: storeUpper(d.productName).slice(0, 500) },
-      });
+  let updated;
+  try {
+    updated = await prisma.$transaction(async (tx) => {
+      if (d.productName !== undefined) {
+        const productName = normalizeProductName(d.productName).slice(0, 500);
+        await assertProductNameAvailable(tx, productName, existing.productId);
+        await tx.product.update({
+          where: { id: existing.productId },
+          data: { name: productName },
+        });
+      }
+      if (d.reorderMin !== undefined) {
+        await tx.product.update({
+          where: { id: existing.productId },
+          data: { reorderMin: d.reorderMin },
+        });
+      }
+      if (hasLotUpdates) {
+        return tx.inventoryLot.update({
+          where: { id },
+          data: lotData,
+        });
+      }
+      return tx.inventoryLot.findUniqueOrThrow({ where: { id } });
+    });
+  } catch (e) {
+    if (e instanceof DuplicateProductNameError) {
+      return NextResponse.json({ error: e.message }, { status: 409 });
     }
-    if (d.reorderMin !== undefined) {
-      await tx.product.update({
-        where: { id: existing.productId },
-        data: { reorderMin: d.reorderMin },
-      });
-    }
-    if (hasLotUpdates) {
-      return tx.inventoryLot.update({
-        where: { id },
-        data: lotData,
-      });
-    }
-    return tx.inventoryLot.findUniqueOrThrow({ where: { id } });
-  });
+    throw e;
+  }
 
   return NextResponse.json({
     lot: {

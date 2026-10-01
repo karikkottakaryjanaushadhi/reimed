@@ -24,6 +24,7 @@ import {
 } from "@/lib/product-schedules";
 import { compactSearchKey } from "@/lib/search-normalize";
 import { JANAUSHADHI_DRUG_CODE_REQUIRED_ERROR } from "@/lib/drug-code";
+import { DUPLICATE_PRODUCT_NAME_ERROR, normalizeProductName } from "@/lib/product-name";
 import { CatalogBrandSearchField } from "../products/catalog-brand-search-field";
 
 /** Matches `product-form.tsx` styling for the new-product modal fields. */
@@ -94,6 +95,8 @@ type Props = {
   onClose: () => void;
   onApply: (result: PurchaseNewProductModalResult) => void;
   initial?: PurchaseNewProductModalInitial | null;
+  /** Other unsaved new-product names on this form (catalog check is separate). */
+  reservedNames?: string[];
   onValidationError?: (message: string) => void;
 };
 
@@ -102,6 +105,7 @@ export function PurchaseNewProductModal({
   onClose,
   onApply,
   initial,
+  reservedNames,
   onValidationError,
 }: Props) {
   const brandFieldId = useId();
@@ -120,6 +124,8 @@ export function PurchaseNewProductModal({
   const [productSchedule, setProductSchedule] = useState<ProductSchedule>(DEFAULT_PRODUCT_SCHEDULE);
   const [reorderMin, setReorderMin] = useState(0);
   const [gstPct, setGstPct] = useState(5);
+  const [applyErr, setApplyErr] = useState<string | null>(null);
+  const [checkingName, setCheckingName] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -138,6 +144,7 @@ export function PurchaseNewProductModal({
     setProductSchedule(initial?.productSchedule ?? DEFAULT_PRODUCT_SCHEDULE);
     setReorderMin(Math.max(0, initial?.reorderMin ?? 0));
     setGstPct(initial?.gstPct ?? 5);
+    setApplyErr(null);
   }, [open, initial]);
 
   useEffect(() => {
@@ -220,7 +227,7 @@ export function PurchaseNewProductModal({
     if (e.key !== "Enter") return;
     if (field === "apply") {
       e.preventDefault();
-      handleApply();
+      void handleApply();
       return;
     }
     e.preventDefault();
@@ -264,15 +271,48 @@ export function PurchaseNewProductModal({
     }
   }
 
-  function handleApply() {
+  async function handleApply() {
     const trimmed = name.trim();
     if (!trimmed) {
-      onValidationError?.("Enter a product name.");
+      const message = "Enter a product name.";
+      setApplyErr(message);
+      onValidationError?.(message);
       return;
     }
     if (productCategory === "JANAUSHADHI" && !drugCode.trim()) {
+      setApplyErr(JANAUSHADHI_DRUG_CODE_REQUIRED_ERROR);
       onValidationError?.(JANAUSHADHI_DRUG_CODE_REQUIRED_ERROR);
       return;
+    }
+    const nameKey = normalizeProductName(trimmed);
+    if (reservedNames?.some((n) => normalizeProductName(n) === nameKey)) {
+      setApplyErr(DUPLICATE_PRODUCT_NAME_ERROR);
+      onValidationError?.(DUPLICATE_PRODUCT_NAME_ERROR);
+      return;
+    }
+    setCheckingName(true);
+    setApplyErr(null);
+    try {
+      const res = await fetch(`/api/products?exactName=${encodeURIComponent(trimmed)}`);
+      const data = (await res.json().catch(() => ({}))) as { exists?: boolean; error?: string };
+      if (!res.ok) {
+        const message = data.error || "Could not check product name";
+        setApplyErr(message);
+        onValidationError?.(message);
+        return;
+      }
+      if (data.exists) {
+        setApplyErr(DUPLICATE_PRODUCT_NAME_ERROR);
+        onValidationError?.(DUPLICATE_PRODUCT_NAME_ERROR);
+        return;
+      }
+    } catch {
+      const message = "Could not check product name";
+      setApplyErr(message);
+      onValidationError?.(message);
+      return;
+    } finally {
+      setCheckingName(false);
     }
     onApply({
       name: trimmed,
@@ -478,6 +518,7 @@ export function PurchaseNewProductModal({
           </label>
         </div>
         </div>
+        {applyErr ? <p className="mt-3 text-sm text-red-600 dark:text-red-400">{applyErr}</p> : null}
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
@@ -488,12 +529,13 @@ export function PurchaseNewProductModal({
           </button>
           <button
             type="button"
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-            onClick={handleApply}
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            onClick={() => void handleApply()}
+            disabled={checkingName}
             onKeyDown={(e) => onNpFieldEnter(e, "apply")}
             data-np-field="apply"
           >
-            Apply
+            {checkingName ? "Checking…" : "Apply"}
           </button>
         </div>
       </div>

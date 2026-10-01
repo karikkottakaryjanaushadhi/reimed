@@ -7,7 +7,9 @@ import {
   janaushadhiDrugCodeValidationError,
 } from "@/lib/drug-code";
 import { prisma } from "@/lib/prisma";
-import { storeUpper, storeUpperNull } from "@/lib/store-text";
+import { normalizeProductName } from "@/lib/product-name";
+import { assertProductNameAvailable, DuplicateProductNameError } from "@/lib/product-name-unique";
+import { storeUpperNull } from "@/lib/store-text";
 import { isProductGstSlab } from "@/lib/product-gst-slabs";
 import { isProductCategory } from "@/lib/product-categories";
 import { isProductType } from "@/lib/product-types";
@@ -66,11 +68,22 @@ export async function PATCH(
     nextDrugCode = drugCodeFromUserInput(parsed.data.drugCode, category);
   }
 
+  if (parsed.data.name != null) {
+    try {
+      await assertProductNameAvailable(prisma, parsed.data.name, id);
+    } catch (e) {
+      if (e instanceof DuplicateProductNameError) {
+        return NextResponse.json({ error: e.message }, { status: 409 });
+      }
+      throw e;
+    }
+  }
+
   try {
     const product = await prisma.product.update({
       where: { id },
       data: {
-        ...(parsed.data.name != null ? { name: storeUpper(parsed.data.name) } : {}),
+        ...(parsed.data.name != null ? { name: normalizeProductName(parsed.data.name) } : {}),
         ...(nextDrugCode ? { sku: nextDrugCode } : {}),
       ...(parsed.data.packSize != null ? { packSize: parsed.data.packSize } : {}),
       ...(parsed.data.hsn != null ? { hsn: storeUpperNull(parsed.data.hsn) } : {}),

@@ -13,6 +13,8 @@ import { isProductSchedule } from "@/lib/product-schedules";
 import { normalizeInventoryLotExpiryDate } from "@/lib/inventory-lot-expiry";
 import { lotSalePricingFromPurchaseLine } from "@/lib/inventory-lot-pricing";
 import { upsertInventoryLotStockFromPurchase } from "@/lib/inventory-lot-upsert";
+import { normalizeProductName } from "@/lib/product-name";
+import { assertProductNameAvailable, DuplicateProductNameError } from "@/lib/product-name-unique";
 import { storeUpper, storeUpperNull, storeUpperOpt } from "@/lib/store-text";
 import type { PaymentMode } from "@/lib/constants";
 import {
@@ -170,10 +172,16 @@ export async function POST(req: Request) {
         gstPct: number;
       }> = [];
 
+      const createdNames = new Set<string>();
+
       for (const l of parsed.data.lines) {
         let productId = l.productId?.trim();
         if (!productId && l.newProduct) {
           const np = l.newProduct;
+          const productName = normalizeProductName(np.name);
+          if (createdNames.has(productName)) throw new DuplicateProductNameError();
+          await assertProductNameAvailable(tx, productName);
+          createdNames.add(productName);
           let brandId: string | null = null;
           const bid = np.brandId?.trim();
           if (bid) {
@@ -199,7 +207,7 @@ export async function POST(req: Request) {
               const created = await tx.product.create({
                 data: {
                   sku,
-                  name: storeUpper(np.name),
+                  name: productName,
                   brandId,
                   genericName: storeUpperNull(np.genericName),
                   packSize: np.packSize ?? 1,
@@ -371,6 +379,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ purchase: { id: purchase.id, purchaseNo: purchase.purchaseNo } });
   } catch (e) {
+    if (e instanceof DuplicateProductNameError) {
+      return NextResponse.json({ error: e.message }, { status: 409 });
+    }
     console.error(e);
     return NextResponse.json({ error: purchaseApiErrorMessage(e) }, { status: 400 });
   }
