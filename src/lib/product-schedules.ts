@@ -1,6 +1,7 @@
 /** Drug & Cosmetics Act schedules for catalog products (UI + DB). */
 export const PRODUCT_SCHEDULES = [
   "NONE",
+  "OTC",
   "G",
   "H",
   "H1",
@@ -20,6 +21,7 @@ export const DEFAULT_PRODUCT_SCHEDULE: ProductSchedule = "NONE";
 
 export const PRODUCT_SCHEDULE_LABELS: Record<ProductSchedule, string> = {
   NONE: "None",
+  OTC: "OTC",
   G: "Schedule G",
   H: "Schedule H",
   H1: "Schedule H1",
