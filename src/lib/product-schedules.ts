@@ -1,7 +1,6 @@
 /** Drug & Cosmetics Act schedules for catalog products (UI + DB). */
 export const PRODUCT_SCHEDULES = [
   "NONE",
-  "OTC",
   "G",
   "H",
   "H1",
@@ -13,6 +12,7 @@ export const PRODUCT_SCHEDULES = [
   "M",
   "N",
   "P",
+  "OTC",
 ] as const;
 
 export type ProductSchedule = (typeof PRODUCT_SCHEDULES)[number];
@@ -21,7 +21,6 @@ export const DEFAULT_PRODUCT_SCHEDULE: ProductSchedule = "NONE";
 
 export const PRODUCT_SCHEDULE_LABELS: Record<ProductSchedule, string> = {
   NONE: "None",
-  OTC: "OTC",
   G: "Schedule G",
   H: "Schedule H",
   H1: "Schedule H1",
@@ -33,6 +32,7 @@ export const PRODUCT_SCHEDULE_LABELS: Record<ProductSchedule, string> = {
   M: "Schedule M",
   N: "Schedule N",
   P: "Schedule P",
+  OTC: "Schedule OTC",
 };
 
 export function isProductSchedule(v: string): v is ProductSchedule {
