@@ -14,7 +14,7 @@ import { isProductGstSlab } from "@/lib/product-gst-slabs";
 import { isProductCategory } from "@/lib/product-categories";
 import { isProductType } from "@/lib/product-types";
 import { isProductSchedule } from "@/lib/product-schedules";
-import { findExistingRackId } from "@/lib/product-racks";
+import { findExistingRackId, setProductStoreRack } from "@/lib/product-racks";
 
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
@@ -92,35 +92,43 @@ export async function PATCH(
   }
 
   try {
-    const product = await prisma.product.update({
-      where: { id },
-      data: {
-        ...(parsed.data.name != null ? { name: normalizeProductName(parsed.data.name) } : {}),
-        ...(nextDrugCode ? { sku: nextDrugCode } : {}),
-      ...(parsed.data.packSize != null ? { packSize: parsed.data.packSize } : {}),
-      ...(parsed.data.hsn != null ? { hsn: storeUpperNull(parsed.data.hsn) } : {}),
-      ...(parsed.data.reorderMin != null ? { reorderMin: parsed.data.reorderMin } : {}),
-      ...(parsed.data.brandId !== undefined ? { brandId: parsed.data.brandId } : {}),
-      ...(nextRackId !== undefined ? { rackId: nextRackId } : {}),
-      ...(parsed.data.genericName !== undefined
-        ? { genericName: storeUpperNull(parsed.data.genericName) }
-        : {}),
-      ...(parsed.data.productCategory !== undefined
-        ? { productCategory: parsed.data.productCategory }
-        : {}),
-      ...(parsed.data.productType !== undefined
-        ? { productType: parsed.data.productType }
-        : {}),
-      ...(parsed.data.productSchedule !== undefined
-        ? { productSchedule: parsed.data.productSchedule }
-        : {}),
-      ...(parsed.data.gstPct !== undefined ? { gstPct: parsed.data.gstPct } : {}),
-    },
-    include: {
-      brand: { select: { id: true, name: true } },
-      rack: { select: { id: true, code: true } },
-    },
-  });
+    const product = await prisma.$transaction(async (tx) => {
+      const updated = await tx.product.update({
+        where: { id },
+        data: {
+          ...(parsed.data.name != null ? { name: normalizeProductName(parsed.data.name) } : {}),
+          ...(nextDrugCode ? { sku: nextDrugCode } : {}),
+          ...(parsed.data.packSize != null ? { packSize: parsed.data.packSize } : {}),
+          ...(parsed.data.hsn != null ? { hsn: storeUpperNull(parsed.data.hsn) } : {}),
+          ...(parsed.data.reorderMin != null ? { reorderMin: parsed.data.reorderMin } : {}),
+          ...(parsed.data.brandId !== undefined ? { brandId: parsed.data.brandId } : {}),
+          ...(parsed.data.genericName !== undefined
+            ? { genericName: storeUpperNull(parsed.data.genericName) }
+            : {}),
+          ...(parsed.data.productCategory !== undefined
+            ? { productCategory: parsed.data.productCategory }
+            : {}),
+          ...(parsed.data.productType !== undefined
+            ? { productType: parsed.data.productType }
+            : {}),
+          ...(parsed.data.productSchedule !== undefined
+            ? { productSchedule: parsed.data.productSchedule }
+            : {}),
+          ...(parsed.data.gstPct !== undefined ? { gstPct: parsed.data.gstPct } : {}),
+        },
+        include: {
+          brand: { select: { id: true, name: true } },
+        },
+      });
+      if (nextRackId !== undefined) {
+        await setProductStoreRack(tx, ctx.activeStoreId, id, nextRackId);
+      }
+      const assignment = await tx.productStoreRack.findUnique({
+        where: { storeId_productId: { storeId: ctx.activeStoreId, productId: id } },
+        select: { rack: { select: { id: true, code: true } } },
+      });
+      return { ...updated, rack: assignment?.rack ?? null };
+    });
     return NextResponse.json({ product });
   } catch (e) {
     const dup = e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";

@@ -57,7 +57,17 @@ export async function GET(req: Request) {
       salesDiscountRs: true,
       packSize: true,
       product: {
-        select: { id: true, name: true, packSize: true, gstPct: true, rack: { select: { code: true } } },
+        select: {
+          id: true,
+          name: true,
+          packSize: true,
+          gstPct: true,
+          storeRacks: {
+            where: { storeId: ctx.activeStoreId },
+            select: { rack: { select: { code: true } } },
+            take: 1,
+          },
+        },
       },
       supplier: { select: { name: true } },
     },
@@ -83,7 +93,7 @@ export async function GET(req: Request) {
         name: lot.product.name,
         packSize: lot.product.packSize,
         gstPct: Number(lot.product.gstPct),
-        rack: lot.product.rack?.code ?? null,
+        rack: lot.product.storeRacks[0]?.rack.code ?? null,
       },
       daysToExpiry,
       expiringSoon: daysToExpiry >= 0 && daysToExpiry <= expiringWithinDays,

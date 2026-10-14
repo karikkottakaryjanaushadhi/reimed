@@ -47,6 +47,7 @@ model Store {
   transfersFrom     StockTransfer[] @relation("TransfersFrom")
   transfersTo       StockTransfer[] @relation("TransfersTo")
   settings          StoreSettings?
+  productRacks      ProductStoreRack[]
 }
 
 model StoreSettings {
@@ -77,12 +78,26 @@ model Brand {
   products  Product[]
 }
 
-/// Shelf / bin location (e.g. A1, A2, Z10) assigned to catalog products.
+/// Shared shelf code (e.g. A1, Z10). Which product uses it is per shop.
 model Rack {
-  id        String    @id @default(cuid())
-  code      String    @unique
-  createdAt DateTime  @default(now())
-  products  Product[]
+  id          String             @id @default(cuid())
+  code        String             @unique
+  createdAt   DateTime           @default(now())
+  assignments ProductStoreRack[]
+}
+
+/// One shelf per product in a shop. The same product can be A1 in one shop and Z10 in another.
+model ProductStoreRack {
+  storeId   String
+  productId String
+  rackId    String
+  store     Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rack      Rack    @relation(fields: [rackId], references: [id], onDelete: Cascade)
+
+  @@id([storeId, productId])
+  @@index([rackId])
+  @@index([productId])
 }
 
 model Supplier {
@@ -110,8 +125,6 @@ model Product {
   name        String
   brandId     String?
   brand       Brand?         @relation(fields: [brandId], references: [id], onDelete: SetNull)
-  rackId      String?
-  rack        Rack?          @relation(fields: [rackId], references: [id], onDelete: SetNull)
   genericName String?
   /// GENERIC | STATIONARY | ETHICAL | VETERINARY | JANAUSHADHI | COSMETIC | SURGICAL
   productCategory String     @default("GENERIC")
@@ -130,9 +143,9 @@ model Product {
   saleLines   SaleLine[]
   purchaseLines     PurchaseLine[]
   transferLines     StockTransferLine[]
+  storeRacks        ProductStoreRack[]
 
   @@index([brandId])
-  @@index([rackId])
   @@index([name])
   @@index([genericName])
   @@index([productCategory])

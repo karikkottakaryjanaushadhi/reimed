@@ -104,6 +104,14 @@ export function productCatalogLotJoin(storeId: string) {
   return Prisma.sql`LEFT JOIN "InventoryLot" il ON il."productId" = p."id" AND il."storeId" = ${storeId}`;
 }
 
+/** Shelf for the active shop. `r` is the rack code used by search, filter, and sort. */
+export function productCatalogRackJoin(storeId: string) {
+  return Prisma.sql`
+    LEFT JOIN "ProductStoreRack" psr ON psr."productId" = p."id" AND psr."storeId" = ${storeId}
+    LEFT JOIN "Rack" r ON r."id" = psr."rackId"
+  `;
+}
+
 export const productCatalogStockExpr = Prisma.sql`COALESCE(SUM(il."quantity"), 0)`;
 
 function productStockHavingSql(stock: ProductStockFilter) {
@@ -153,7 +161,7 @@ export async function getProductFilterOptions(
           SELECT DISTINCT b."name" AS "name"
           FROM "Product" p
           INNER JOIN "Brand" b ON b."id" = p."brandId"
-          LEFT JOIN "Rack" r ON r."id" = p."rackId"
+          ${productCatalogRackJoin(storeId)}
           ${lotJoin}
           ${supplierJoin}
           WHERE ${brandWhere}
@@ -165,7 +173,7 @@ export async function getProductFilterOptions(
           SELECT DISTINCT b."name" AS "name"
           FROM "Product" p
           INNER JOIN "Brand" b ON b."id" = p."brandId"
-          LEFT JOIN "Rack" r ON r."id" = p."rackId"
+          ${productCatalogRackJoin(storeId)}
           WHERE ${brandWhere}
           ORDER BY b."name" ASC
         `;
@@ -175,7 +183,7 @@ export async function getProductFilterOptions(
           SELECT DISTINCT s."name" AS "name"
           FROM "Product" p
           LEFT JOIN "Brand" b ON b."id" = p."brandId"
-          LEFT JOIN "Rack" r ON r."id" = p."rackId"
+          ${productCatalogRackJoin(storeId)}
           INNER JOIN "InventoryLot" il ON il."productId" = p."id" AND il."storeId" = ${storeId}
           INNER JOIN "Supplier" s ON s."id" = il."supplierId"
           WHERE ${supplierWhere}
@@ -187,7 +195,7 @@ export async function getProductFilterOptions(
           SELECT DISTINCT s."name" AS "name"
           FROM "Product" p
           LEFT JOIN "Brand" b ON b."id" = p."brandId"
-          LEFT JOIN "Rack" r ON r."id" = p."rackId"
+          ${productCatalogRackJoin(storeId)}
           INNER JOIN "InventoryLot" il ON il."productId" = p."id" AND il."storeId" = ${storeId}
           INNER JOIN "Supplier" s ON s."id" = il."supplierId"
           WHERE ${supplierWhere}

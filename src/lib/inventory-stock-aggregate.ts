@@ -141,7 +141,8 @@ export async function aggregateStoreStock(params: {
       FROM "InventoryLot" il
       INNER JOIN "Product" p ON p."id" = il."productId"
       LEFT JOIN "Brand" b ON b."id" = p."brandId"
-      LEFT JOIN "Rack" r ON r."id" = p."rackId"
+      LEFT JOIN "ProductStoreRack" psr ON psr."productId" = p."id" AND psr."storeId" = ${params.storeId}
+      LEFT JOIN "Rack" r ON r."id" = psr."rackId"
       LEFT JOIN "Supplier" s ON s."id" = il."supplierId"
       WHERE il."storeId" = ${params.storeId}
         AND il."quantity" >= 0

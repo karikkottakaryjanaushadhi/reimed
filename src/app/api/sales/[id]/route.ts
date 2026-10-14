@@ -41,7 +41,18 @@ export async function GET(
         createdBy: { select: { name: true } },
         lines: {
           include: {
-            product: { select: { sku: true, name: true, packSize: true, rack: { select: { code: true } } } },
+            product: {
+              select: {
+                sku: true,
+                name: true,
+                packSize: true,
+                storeRacks: {
+                  where: { storeId },
+                  select: { rack: { select: { code: true } } },
+                  take: 1,
+                },
+              },
+            },
             lot: { select: { batchNo: true, expiryDate: true, mrp: true, costPrice: true, quantity: true } },
           },
         },
@@ -101,7 +112,7 @@ export async function GET(
           lotId: l.lotId,
           sku: l.product.sku,
           name: l.product.name,
-          rack: l.product.rack?.code ?? null,
+          rack: l.product.storeRacks[0]?.rack.code ?? null,
           packSize: saleLinePackSize(l),
           batchNo: l.lot.batchNo,
           expiryDate: l.lot.expiryDate.toISOString(),

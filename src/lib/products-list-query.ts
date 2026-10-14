@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import type { ProductListRow } from "@/lib/product-list-row";
 import {
   productCatalogLotJoin,
+  productCatalogRackJoin,
   productCatalogStockExpr,
   productCatalogWhereParts,
   type ProductStockFilter,
@@ -100,6 +101,7 @@ function buildProductListSql(params: ProductListQueryParams) {
   const storeId = params.storeId;
   const whereSql = Prisma.join(productCatalogWhereParts(params), " AND ");
   const lotJoin = productCatalogLotJoin(storeId);
+  const rackJoin = productCatalogRackJoin(storeId);
 
   let havingSql = Prisma.empty;
   if (stock === "low") {
@@ -110,7 +112,7 @@ function buildProductListSql(params: ProductListQueryParams) {
     havingSql = Prisma.sql`HAVING ${productCatalogStockExpr} > 0`;
   }
 
-  return { whereSql, havingSql, lotJoin, sort, dir };
+  return { whereSql, havingSql, lotJoin, rackJoin, sort, dir };
 }
 
 function mapProductListRows(
@@ -144,7 +146,7 @@ function mapProductListRows(
 }
 
 export async function countProductList(params: ProductListQueryParams): Promise<number> {
-  const { whereSql, havingSql, lotJoin } = buildProductListSql(params);
+  const { whereSql, havingSql, lotJoin, rackJoin } = buildProductListSql(params);
   const countRows = await prisma.$queryRaw<Array<{ count: bigint }>>(
     Prisma.sql`
       SELECT COUNT(*)::bigint AS "count"
@@ -152,7 +154,7 @@ export async function countProductList(params: ProductListQueryParams): Promise<
         SELECT p."id"
         FROM "Product" p
         LEFT JOIN "Brand" b ON b."id" = p."brandId"
-        LEFT JOIN "Rack" r ON r."id" = p."rackId"
+        ${rackJoin}
         ${lotJoin}
         LEFT JOIN "Supplier" s ON s."id" = il."supplierId"
         WHERE ${whereSql}
@@ -167,7 +169,7 @@ export async function countProductList(params: ProductListQueryParams): Promise<
 export async function queryProductList(
   params: ProductListQueryParams & { limit?: number; offset?: number },
 ): Promise<ProductListRow[]> {
-  const { whereSql, havingSql, lotJoin, sort, dir } = buildProductListSql(params);
+  const { whereSql, havingSql, lotJoin, rackJoin, sort, dir } = buildProductListSql(params);
   const pagingSql =
     params.limit != null
       ? Prisma.sql`LIMIT ${params.limit} OFFSET ${params.offset ?? 0}`
@@ -192,7 +194,7 @@ export async function queryProductList(
              p."productType" AS "productType",
              p."productSchedule" AS "productSchedule",
              p."brandId" AS "brandId",
-             p."rackId" AS "rackId",
+             psr."rackId" AS "rackId",
              p."packSize" AS "packSize",
              p."reorderMin" AS "reorderMin",
              p."gstPct" AS "gstPct",
@@ -202,11 +204,11 @@ export async function queryProductList(
              NULLIF(string_agg(DISTINCT s."name", ', '), '') AS "suppliers"
       FROM "Product" p
       LEFT JOIN "Brand" b ON b."id" = p."brandId"
-      LEFT JOIN "Rack" r ON r."id" = p."rackId"
+      ${rackJoin}
       ${lotJoin}
       LEFT JOIN "Supplier" s ON s."id" = il."supplierId"
       WHERE ${whereSql}
-      GROUP BY p."id", p."sku", p."name", p."genericName", p."productCategory", p."productType", p."productSchedule", p."brandId", p."rackId", p."packSize", p."reorderMin", p."gstPct", b."name", r."code"
+      GROUP BY p."id", p."sku", p."name", p."genericName", p."productCategory", p."productType", p."productSchedule", p."brandId", psr."rackId", p."packSize", p."reorderMin", p."gstPct", b."name", r."code"
       ${havingSql}
       ORDER BY ${productSortOrder(sort, dir)}
       ${pagingSql}

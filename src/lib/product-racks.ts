@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 
-/** Shelf codes assigned to catalog products (e.g. A1, Z10). */
+/** Shared shelf codes (e.g. A1, Z10). A product's shelf is stored per shop. */
 export const RACK_CODE_PATTERN = /^[A-Z]{1,2}[0-9]{1,3}$/;
 
 export const INVALID_RACK_CODE_ERROR = "Rack must be a letter plus number (e.g. A1, A2, Z10)";
@@ -42,4 +42,26 @@ export async function findExistingRackId(
 ): Promise<string | null> {
   const rack = await db.rack.findUnique({ where: { id }, select: { id: true } });
   return rack?.id ?? null;
+}
+
+type StoreRackDb = {
+  productStoreRack: PrismaClient["productStoreRack"];
+};
+
+/** Sets or clears the shelf for one product in one shop. */
+export async function setProductStoreRack(
+  db: StoreRackDb,
+  storeId: string,
+  productId: string,
+  rackId: string | null,
+): Promise<void> {
+  if (!rackId) {
+    await db.productStoreRack.deleteMany({ where: { storeId, productId } });
+    return;
+  }
+  await db.productStoreRack.upsert({
+    where: { storeId_productId: { storeId, productId } },
+    create: { storeId, productId, rackId },
+    update: { rackId },
+  });
 }

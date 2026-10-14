@@ -9,7 +9,7 @@ import { isProductGstSlab, snapProductGstPct } from "@/lib/product-gst-slabs";
 import { isProductCategory } from "@/lib/product-categories";
 import { isProductType } from "@/lib/product-types";
 import { isProductSchedule } from "@/lib/product-schedules";
-import { findExistingRackId } from "@/lib/product-racks";
+import { findExistingRackId, setProductStoreRack } from "@/lib/product-racks";
 import { normalizeInventoryLotExpiryDate } from "@/lib/inventory-lot-expiry";
 import { lotSalePricingFromPurchaseLine } from "@/lib/inventory-lot-pricing";
 import { upsertInventoryLotStockFromPurchase } from "@/lib/inventory-lot-upsert";
@@ -155,10 +155,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                 ...(np.productCategory !== undefined ? { productCategory: np.productCategory } : {}),
                 ...(np.productType !== undefined ? { productType: np.productType } : {}),
                 ...(np.productSchedule !== undefined ? { productSchedule: np.productSchedule } : {}),
-                ...(rackId ? { rackId } : {}),
                 ...(np.gstPct !== undefined ? { gstPct: np.gstPct } : {}),
               },
             });
+            if (rackId) await setProductStoreRack(tx, storeId, created.id, rackId);
             productId = created.id;
             break;
           } catch (e) {

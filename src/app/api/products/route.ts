@@ -9,7 +9,7 @@ import { isProductGstSlab } from "@/lib/product-gst-slabs";
 import { isProductCategory } from "@/lib/product-categories";
 import { isProductType } from "@/lib/product-types";
 import { isProductSchedule } from "@/lib/product-schedules";
-import { findExistingRackId } from "@/lib/product-racks";
+import { findExistingRackId, setProductStoreRack } from "@/lib/product-racks";
 import { resolveBrandId } from "@/lib/catalog-name-unique";
 import { normalizeProductName } from "@/lib/product-name";
 import {
@@ -215,32 +215,42 @@ export async function POST(req: Request) {
 
   for (let attempt = 0; attempt < 6; attempt++) {
     try {
-      const p = await prisma.product.create({
-        data: {
-          sku,
-          name: productName,
-          brandId: resolvedBrandId,
-          rackId: resolvedRackId,
-          genericName: storeUpperNull(parsed.data.genericName),
-          packSize: parsed.data.packSize ?? 1,
-          unit: "UNIT",
-          hsn: storeUpperOpt(parsed.data.hsn),
-          reorderMin: parsed.data.reorderMin ?? 0,
-          ...(parsed.data.productCategory !== undefined
-            ? { productCategory: parsed.data.productCategory }
-            : {}),
-          ...(parsed.data.productType !== undefined
-            ? { productType: parsed.data.productType }
-            : {}),
-          ...(parsed.data.productSchedule !== undefined
-            ? { productSchedule: parsed.data.productSchedule }
-            : {}),
-          ...(parsed.data.gstPct !== undefined ? { gstPct: parsed.data.gstPct } : {}),
-        },
-        include: {
-          brand: { select: { id: true, name: true } },
-          rack: { select: { id: true, code: true } },
-        },
+      const p = await prisma.$transaction(async (tx) => {
+        const created = await tx.product.create({
+          data: {
+            sku,
+            name: productName,
+            brandId: resolvedBrandId,
+            genericName: storeUpperNull(parsed.data.genericName),
+            packSize: parsed.data.packSize ?? 1,
+            unit: "UNIT",
+            hsn: storeUpperOpt(parsed.data.hsn),
+            reorderMin: parsed.data.reorderMin ?? 0,
+            ...(parsed.data.productCategory !== undefined
+              ? { productCategory: parsed.data.productCategory }
+              : {}),
+            ...(parsed.data.productType !== undefined
+              ? { productType: parsed.data.productType }
+              : {}),
+            ...(parsed.data.productSchedule !== undefined
+              ? { productSchedule: parsed.data.productSchedule }
+              : {}),
+            ...(parsed.data.gstPct !== undefined ? { gstPct: parsed.data.gstPct } : {}),
+          },
+          include: {
+            brand: { select: { id: true, name: true } },
+          },
+        });
+        if (resolvedRackId) {
+          await setProductStoreRack(tx, ctx.activeStoreId, created.id, resolvedRackId);
+        }
+        const rack = resolvedRackId
+          ? await tx.rack.findUnique({
+              where: { id: resolvedRackId },
+              select: { id: true, code: true },
+            })
+          : null;
+        return { ...created, rack };
       });
       return NextResponse.json({ product: p });
     } catch (e) {
