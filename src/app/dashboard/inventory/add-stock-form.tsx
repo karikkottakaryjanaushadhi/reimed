@@ -66,6 +66,7 @@ type StockLine = {
   catalogProductCategory?: ProductCategory;
   catalogProductType?: ProductType;
   catalogProductSchedule?: ProductSchedule;
+  catalogRackId?: string | null;
   catalogDrugCode?: string;
   manufacturer?: string;
 };
@@ -321,6 +322,7 @@ export function AddStockForm({
         productCategory: line.catalogProductCategory,
         productType: line.catalogProductType,
         productSchedule: line.catalogProductSchedule,
+        rackId: line.catalogRackId ?? null,
         brandId: line.catalogBrandId ?? null,
         brandName: line.manufacturer ?? "",
         drugCode: line.catalogDrugCode ?? "",
@@ -349,6 +351,7 @@ export function AddStockForm({
       catalogProductCategory: v.productCategory,
       catalogProductType: v.productType,
       catalogProductSchedule: v.productSchedule,
+      catalogRackId: v.rackId,
       catalogDrugCode:
         v.productCategory === "JANAUSHADHI" && v.drugCode.trim() ? v.drugCode.trim() : undefined,
       gstPct: v.gstPct,
@@ -403,6 +406,7 @@ export function AddStockForm({
       productCategory: line.catalogProductCategory,
       productType: line.catalogProductType,
       productSchedule: line.catalogProductSchedule,
+      ...(line.catalogRackId ? { rackId: line.catalogRackId } : {}),
       gstPct: line.catalogGstPct ?? line.gstPct,
     };
     if (line.catalogBrandId) body.brandId = line.catalogBrandId;

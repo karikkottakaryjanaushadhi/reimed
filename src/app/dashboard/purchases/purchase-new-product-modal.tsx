@@ -26,6 +26,7 @@ import { compactSearchKey } from "@/lib/search-normalize";
 import { JANAUSHADHI_DRUG_CODE_REQUIRED_ERROR } from "@/lib/drug-code";
 import { DUPLICATE_PRODUCT_NAME_ERROR, normalizeProductName } from "@/lib/product-name";
 import { CatalogBrandSearchField } from "../products/catalog-brand-search-field";
+import { CatalogRackSelect } from "../products/catalog-rack-select";
 
 /** Matches `product-form.tsx` styling for the new-product modal fields. */
 const catalogLabelCls = "text-xs font-medium text-zinc-600 dark:text-zinc-400";
@@ -39,6 +40,7 @@ const NP_MODAL_FIELD_IDS = [
   "category",
   "type",
   "schedule",
+  "rack",
   "drugCode",
   "pack",
   "reorderMin",
@@ -48,7 +50,7 @@ const NP_MODAL_FIELD_IDS = [
 type NpModalField = (typeof NP_MODAL_FIELD_IDS)[number];
 
 function npModalFields(category: ProductCategory): NpModalField[] {
-  const fields: NpModalField[] = ["name", "genericName", "brand", "category", "type", "schedule"];
+  const fields: NpModalField[] = ["name", "genericName", "brand", "category", "type", "schedule", "rack"];
   if (category === "JANAUSHADHI") fields.push("drugCode");
   fields.push("pack", "reorderMin", "gstPct", "apply");
   return fields;
@@ -83,6 +85,7 @@ export type PurchaseNewProductModalResult = {
   productCategory: ProductCategory;
   productType: ProductType;
   productSchedule: ProductSchedule;
+  rackId: string | null;
   packSize: number;
   reorderMin: number;
   gstPct: number;
@@ -122,6 +125,7 @@ export function PurchaseNewProductModal({
   const [productCategory, setProductCategory] = useState<ProductCategory>(DEFAULT_PRODUCT_CATEGORY);
   const [productType, setProductType] = useState<ProductType>(DEFAULT_PRODUCT_TYPE);
   const [productSchedule, setProductSchedule] = useState<ProductSchedule>(DEFAULT_PRODUCT_SCHEDULE);
+  const [rackId, setRackId] = useState<string | null>(null);
   const [reorderMin, setReorderMin] = useState(0);
   const [gstPct, setGstPct] = useState(5);
   const [applyErr, setApplyErr] = useState<string | null>(null);
@@ -142,6 +146,7 @@ export function PurchaseNewProductModal({
     setProductCategory(initial?.productCategory ?? DEFAULT_PRODUCT_CATEGORY);
     setProductType(initial?.productType ?? DEFAULT_PRODUCT_TYPE);
     setProductSchedule(initial?.productSchedule ?? DEFAULT_PRODUCT_SCHEDULE);
+    setRackId(initial?.rackId ?? null);
     setReorderMin(Math.max(0, initial?.reorderMin ?? 0));
     setGstPct(initial?.gstPct ?? 5);
     setApplyErr(null);
@@ -323,6 +328,7 @@ export function PurchaseNewProductModal({
       productCategory,
       productType,
       productSchedule,
+      rackId,
       packSize: Math.max(1, Math.floor(Number(packSize)) || 1),
       reorderMin: Math.max(0, Math.floor(Number(reorderMin)) || 0),
       gstPct: Number(gstPct),
@@ -450,6 +456,17 @@ export function PurchaseNewProductModal({
               ))}
             </select>
           </label>
+          <CatalogRackSelect
+            value={rackId}
+            onChange={setRackId}
+            labelCls={catalogLabelCls}
+            inputCls={catalogInputCls}
+            wrapClassName="flex min-w-0 flex-col gap-1 md:flex-1"
+            selectProps={{
+              "data-np-field": "rack",
+              onKeyDown: (e) => onNpFieldEnter(e, "rack"),
+            }}
+          />
           {productCategory === "JANAUSHADHI" ? (
             <label className="flex min-w-0 flex-col gap-1 md:flex-1">
               <span className={catalogLabelCls}>Drug code</span>

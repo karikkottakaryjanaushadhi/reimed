@@ -14,6 +14,8 @@ export type AggregatedStockRow = {
   name: string;
   genericName: string | null;
   brand: string | null;
+  /** Shelf code (e.g. A1). Null when the product has no rack. */
+  rack: string | null;
   supplier: string | null;
   packSize: number;
   gstPct: number;
@@ -88,6 +90,7 @@ export async function aggregateStoreStock(params: {
       name: string;
       genericName: string | null;
       brand: string | null;
+      rack: string | null;
       supplier: string | null;
       packSize: unknown;
       gstPct: unknown;
@@ -108,6 +111,7 @@ export async function aggregateStoreStock(params: {
         p."name" AS "name",
         p."genericName" AS "genericName",
         b."name" AS "brand",
+        r."code" AS "rack",
         NULLIF(string_agg(DISTINCT s."name", ', ' ORDER BY s."name"), '') AS "supplier",
         p."packSize" AS "packSize",
         p."gstPct" AS "gstPct",
@@ -137,12 +141,13 @@ export async function aggregateStoreStock(params: {
       FROM "InventoryLot" il
       INNER JOIN "Product" p ON p."id" = il."productId"
       LEFT JOIN "Brand" b ON b."id" = p."brandId"
+      LEFT JOIN "Rack" r ON r."id" = p."rackId"
       LEFT JOIN "Supplier" s ON s."id" = il."supplierId"
       WHERE il."storeId" = ${params.storeId}
         AND il."quantity" >= 0
         ${productIdClause}
         ${sellableClause}
-      GROUP BY p."id", p."sku", p."name", p."genericName", b."name", p."packSize", p."gstPct", p."reorderMin"
+      GROUP BY p."id", p."sku", p."name", p."genericName", b."name", r."code", p."packSize", p."gstPct", p."reorderMin"
     `,
   );
 
@@ -156,6 +161,7 @@ export async function aggregateStoreStock(params: {
       name: r.name,
       genericName: r.genericName,
       brand: r.brand,
+      rack: r.rack,
       supplier: r.supplier,
       packSize: Number(r.packSize) || 1,
       gstPct: Number(r.gstPct) || 0,

@@ -8,6 +8,8 @@ export type ProductListRow = {
   productSchedule: string | null;
   brandId: string | null;
   brandName: string | null;
+  rackId: string | null;
+  rackCode: string | null;
   packSize: number;
   reorderMin: number;
   gstPct: number;

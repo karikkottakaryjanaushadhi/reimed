@@ -28,6 +28,7 @@ export type ProductInquiryProduct = {
   productCategory: string;
   productType: string;
   productSchedule: string;
+  rack: string | null;
   reorderMin: number;
   unit: string;
 };

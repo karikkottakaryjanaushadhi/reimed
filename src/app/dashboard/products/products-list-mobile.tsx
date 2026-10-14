@@ -10,6 +10,7 @@ import { StockGstSelect } from "@/app/dashboard/inventory/stock-gst-select";
 import { StockIntField } from "@/app/dashboard/inventory/stock-int-field";
 import { StockProductNameField } from "@/app/dashboard/inventory/stock-product-name-field";
 import { StockScheduleSelect } from "@/app/dashboard/inventory/stock-schedule-select";
+import { StockRackSelect } from "@/app/dashboard/inventory/stock-rack-select";
 import { StockTypeSelect } from "@/app/dashboard/inventory/stock-type-select";
 
 function stockCellClass(stockQty: number, reorderMin: number): string {
@@ -22,10 +23,12 @@ export function ProductsListMobile({
   products,
   isManager,
   brands,
+  racks,
 }: {
   products: ProductListRow[];
   isManager: boolean;
   brands: { id: string; name: string }[];
+  racks: { id: string; code: string }[];
 }) {
   if (products.length === 0) {
     return (
@@ -38,7 +41,7 @@ export function ProductsListMobile({
   return (
     <div className="space-y-3 md:hidden">
       {products.map((p) => (
-        <ProductCatalogCard key={p.productId} p={p} isManager={isManager} brands={brands} />
+        <ProductCatalogCard key={p.productId} p={p} isManager={isManager} brands={brands} racks={racks} />
       ))}
     </div>
   );
@@ -48,10 +51,12 @@ function ProductCatalogCard({
   p,
   isManager,
   brands,
+  racks,
 }: {
   p: ProductListRow;
   isManager: boolean;
   brands: { id: string; name: string }[];
+  racks: { id: string; code: string }[];
 }) {
   const [category, setCategory] = useState(p.productCategory);
   const janaushadhi = category === "JANAUSHADHI";
@@ -108,6 +113,16 @@ function ProductCatalogCard({
               <StockScheduleSelect
                 productId={p.productId}
                 productSchedule={p.productSchedule}
+                canEdit={isManager}
+              />
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Rack</p>
+              <StockRackSelect
+                productId={p.productId}
+                rackId={p.rackId}
+                rackCode={p.rackCode}
+                racks={racks}
                 canEdit={isManager}
               />
             </div>

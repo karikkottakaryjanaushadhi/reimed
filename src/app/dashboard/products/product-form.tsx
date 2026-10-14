@@ -25,6 +25,7 @@ import {
 import { compactSearchKey } from "@/lib/search-normalize";
 import { drugCodeFormValue, JANAUSHADHI_DRUG_CODE_REQUIRED_ERROR } from "@/lib/drug-code";
 import { CatalogBrandSearchField } from "./catalog-brand-search-field";
+import { CatalogRackSelect } from "./catalog-rack-select";
 
 const labelCls = "text-xs font-medium text-zinc-600 dark:text-zinc-400";
 const inputCls =
@@ -41,6 +42,7 @@ export type ProductFormValues = {
   productCategory: ProductCategory;
   productType: ProductType;
   productSchedule: ProductSchedule;
+  rackId: string | null;
   packSize: number;
   reorderMin: number;
   gstPct: number;
@@ -64,6 +66,7 @@ function emptyValues(): ProductFormValues {
     productCategory: DEFAULT_PRODUCT_CATEGORY,
     productType: DEFAULT_PRODUCT_TYPE,
     productSchedule: DEFAULT_PRODUCT_SCHEDULE,
+    rackId: null,
     packSize: 10,
     reorderMin: 0,
     gstPct: 5,
@@ -93,6 +96,7 @@ export function ProductForm({
   const [productSchedule, setProductSchedule] = useState<ProductSchedule>(
     initial?.productSchedule ?? DEFAULT_PRODUCT_SCHEDULE,
   );
+  const [rackId, setRackId] = useState<string | null>(initial?.rackId ?? null);
   const [brandQ, setBrandQ] = useState(initial?.brandName ?? "");
   const [brandId, setBrandId] = useState<string | null>(initial?.brandId ?? null);
   const [lockedBrandName, setLockedBrandName] = useState<string | null>(
@@ -114,6 +118,7 @@ export function ProductForm({
     setProductCategory(initial.productCategory ?? DEFAULT_PRODUCT_CATEGORY);
     setProductType(initial.productType ?? DEFAULT_PRODUCT_TYPE);
     setProductSchedule(initial.productSchedule ?? DEFAULT_PRODUCT_SCHEDULE);
+    setRackId(initial.rackId ?? null);
     setBrandQ(initial.brandName ?? "");
     setBrandId(initial.brandId ?? null);
     setLockedBrandName(initial.brandId ? (initial.brandName ?? null) : null);
@@ -226,6 +231,7 @@ export function ProductForm({
         productCategory,
         productType,
         productSchedule,
+        rackId,
         brandId,
         packSize,
         reorderMin,
@@ -251,6 +257,7 @@ export function ProductForm({
         setProductCategory(cleared.productCategory);
         setProductType(cleared.productType);
         setProductSchedule(cleared.productSchedule);
+        setRackId(cleared.rackId);
         setBrandQ("");
         setBrandId(null);
         setLockedBrandName(null);
@@ -367,6 +374,12 @@ export function ProductForm({
                 ))}
               </select>
             </label>
+            <CatalogRackSelect
+              value={rackId}
+              onChange={setRackId}
+              labelCls={labelCls}
+              inputCls={inputCls}
+            />
             {productCategory === "JANAUSHADHI" ? (
               <label className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className={labelCls}>Drug code</span>
@@ -462,6 +475,7 @@ export function productRowToFormValues(row: {
   productCategory: string | null;
   productType: string | null;
   productSchedule: string | null;
+  rackId?: string | null;
   packSize: number;
   reorderMin: number;
   gstPct: number;
@@ -485,6 +499,7 @@ export function productRowToFormValues(row: {
       row.productSchedule && PRODUCT_SCHEDULES.includes(row.productSchedule as ProductSchedule)
         ? (row.productSchedule as ProductSchedule)
         : DEFAULT_PRODUCT_SCHEDULE,
+    rackId: row.rackId ?? null,
     packSize: row.packSize,
     reorderMin: row.reorderMin,
     gstPct: row.gstPct,

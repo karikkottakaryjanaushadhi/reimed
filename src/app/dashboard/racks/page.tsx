@@ -1,0 +1,59 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getAuthContext, isManager } from "@/lib/auth-context";
+import { prisma } from "@/lib/prisma";
+import { sortRacksByCode } from "@/lib/product-racks";
+import { RackDeleteButton } from "./rack-delete-button";
+
+export default async function RacksPage() {
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+
+  const racks = sortRacksByCode(await prisma.rack.findMany());
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">Racks</h1>
+        {isManager(ctx) ? (
+          <Link href="/dashboard/racks/new" className="text-sm font-medium text-brand-blue-light hover:underline">
+            Add rack →
+          </Link>
+        ) : null}
+      </div>
+      <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+        Racks are shelf locations (A1, A2, Z10, …). Add them here, then pick a rack when you add or edit
+        catalog products.
+      </p>
+      <ul className="space-y-2">
+        {racks.map((r) => (
+          <li
+            key={r.id}
+            className="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0 flex-1 font-medium tabular-nums text-zinc-900 dark:text-zinc-50">{r.code}</div>
+              {isManager(ctx) ? (
+                <span className="flex shrink-0 items-center gap-3">
+                  <Link
+                    href={`/dashboard/racks/${r.id}/edit`}
+                    className="text-sm font-medium text-brand-blue-light hover:underline"
+                  >
+                    Edit
+                  </Link>
+                  <RackDeleteButton id={r.id} code={r.code} />
+                </span>
+              ) : null}
+            </div>
+            <div className="text-xs text-zinc-500">
+              Added {r.createdAt.toISOString().slice(0, 10)}
+            </div>
+          </li>
+        ))}
+      </ul>
+      {racks.length === 0 ? (
+        <p className="text-sm text-zinc-500">No racks yet. Add one above for use on products.</p>
+      ) : null}
+    </div>
+  );
+}

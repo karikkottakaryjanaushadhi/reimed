@@ -3,6 +3,7 @@ import { getAuthContext } from "@/lib/auth-context";
 import {
   getProductFilterOptions,
   parseProductCategoryFilter,
+  parseProductRackFilter,
   parseProductScheduleFilter,
   parseProductTypeFilter,
   type ProductStockFilter,
@@ -27,6 +28,7 @@ export async function GET(req: Request) {
     category: parseProductCategoryFilter(searchParams.get("category")),
     type: parseProductTypeFilter(searchParams.get("type")),
     schedule: parseProductScheduleFilter(searchParams.get("schedule")),
+    rack: parseProductRackFilter(searchParams.get("rack")),
     supplier: searchParams.get("supplier") ?? undefined,
   });
 

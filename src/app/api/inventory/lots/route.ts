@@ -57,7 +57,7 @@ export async function GET(req: Request) {
       salesDiscountRs: true,
       packSize: true,
       product: {
-        select: { id: true, name: true, packSize: true, gstPct: true },
+        select: { id: true, name: true, packSize: true, gstPct: true, rack: { select: { code: true } } },
       },
       supplier: { select: { name: true } },
     },
@@ -83,6 +83,7 @@ export async function GET(req: Request) {
         name: lot.product.name,
         packSize: lot.product.packSize,
         gstPct: Number(lot.product.gstPct),
+        rack: lot.product.rack?.code ?? null,
       },
       daysToExpiry,
       expiringSoon: daysToExpiry >= 0 && daysToExpiry <= expiringWithinDays,

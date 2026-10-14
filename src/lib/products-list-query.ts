@@ -21,7 +21,8 @@ export type ProductListSort =
   | "packSize"
   | "reorderMin"
   | "gst"
-  | "stock";
+  | "stock"
+  | "rack";
 
 export type ProductListQueryParams = {
   storeId: string;
@@ -32,6 +33,7 @@ export type ProductListQueryParams = {
   category?: string;
   type?: string;
   schedule?: string;
+  rack?: string;
   supplier?: string;
   sort?: string;
   dir?: string;
@@ -56,6 +58,8 @@ function productSortOrder(sort: ProductListSort, dir: "asc" | "desc") {
       return Prisma.sql`p."gstPct" ${Prisma.raw(dir)}${tiebreak}`;
     case "stock":
       return Prisma.sql`${productCatalogStockExpr} ${Prisma.raw(dir)}${tiebreak}`;
+    case "rack":
+      return Prisma.sql`COALESCE(r."code", '') ${Prisma.raw(dir)}${tiebreak}`;
     case "name":
     default:
       return Prisma.sql`p."name" ${Prisma.raw(dir)}, p."id" ASC`;
@@ -77,6 +81,7 @@ export function parseProductListSort(raw: unknown): ProductListSort {
     raw === "generic" ||
     raw === "gst" ||
     raw === "stock" ||
+    raw === "rack" ||
     raw === "name"
   ) {
     return raw;
@@ -128,6 +133,8 @@ function mapProductListRows(
     productSchedule: p.productSchedule,
     brandId: p.brandId,
     brandName: p.brandName,
+    rackId: p.rackId,
+    rackCode: p.rackCode,
     packSize: Number(p.packSize) || 1,
     reorderMin: Number(p.reorderMin) || 0,
     gstPct: gstPctNumber(p.gstPct),
@@ -145,6 +152,7 @@ export async function countProductList(params: ProductListQueryParams): Promise<
         SELECT p."id"
         FROM "Product" p
         LEFT JOIN "Brand" b ON b."id" = p."brandId"
+        LEFT JOIN "Rack" r ON r."id" = p."rackId"
         ${lotJoin}
         LEFT JOIN "Supplier" s ON s."id" = il."supplierId"
         WHERE ${whereSql}
@@ -184,18 +192,21 @@ export async function queryProductList(
              p."productType" AS "productType",
              p."productSchedule" AS "productSchedule",
              p."brandId" AS "brandId",
+             p."rackId" AS "rackId",
              p."packSize" AS "packSize",
              p."reorderMin" AS "reorderMin",
              p."gstPct" AS "gstPct",
              b."name" AS "brandName",
+             r."code" AS "rackCode",
              ${productCatalogStockExpr}::int AS "stockQty",
              NULLIF(string_agg(DISTINCT s."name", ', '), '') AS "suppliers"
       FROM "Product" p
       LEFT JOIN "Brand" b ON b."id" = p."brandId"
+      LEFT JOIN "Rack" r ON r."id" = p."rackId"
       ${lotJoin}
       LEFT JOIN "Supplier" s ON s."id" = il."supplierId"
       WHERE ${whereSql}
-      GROUP BY p."id", p."sku", p."name", p."genericName", p."productCategory", p."productType", p."productSchedule", p."brandId", p."packSize", p."reorderMin", p."gstPct", b."name"
+      GROUP BY p."id", p."sku", p."name", p."genericName", p."productCategory", p."productType", p."productSchedule", p."brandId", p."rackId", p."packSize", p."reorderMin", p."gstPct", b."name", r."code"
       ${havingSql}
       ORDER BY ${productSortOrder(sort, dir)}
       ${pagingSql}

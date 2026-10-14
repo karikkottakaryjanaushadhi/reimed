@@ -9,6 +9,7 @@ import { isProductGstSlab } from "@/lib/product-gst-slabs";
 import { isProductCategory } from "@/lib/product-categories";
 import { isProductType } from "@/lib/product-types";
 import { isProductSchedule } from "@/lib/product-schedules";
+import { findExistingRackId } from "@/lib/product-racks";
 import { resolveBrandId } from "@/lib/catalog-name-unique";
 import { normalizeProductName } from "@/lib/product-name";
 import {
@@ -132,6 +133,7 @@ const createSchema = z.object({
   brandId: z.string().min(1).optional(),
   /** If set without brandId, upserts Brand by name and links. */
   brandName: z.string().optional(),
+  rackId: z.union([z.string().min(1), z.null()]).optional(),
   genericName: z.string().optional(),
   packSize: z.number().int().min(1).optional(),
   hsn: z.string().optional(),
@@ -194,6 +196,13 @@ export async function POST(req: Request) {
     }
   }
 
+  let resolvedRackId: string | null = null;
+  const requestedRackId = parsed.data.rackId?.trim();
+  if (requestedRackId) {
+    resolvedRackId = await findExistingRackId(prisma, requestedRackId);
+    if (!resolvedRackId) return NextResponse.json({ error: "Unknown rack" }, { status: 400 });
+  }
+
   const productName = normalizeProductName(parsed.data.name);
   try {
     await assertProductNameAvailable(prisma, productName);
@@ -211,6 +220,7 @@ export async function POST(req: Request) {
           sku,
           name: productName,
           brandId: resolvedBrandId,
+          rackId: resolvedRackId,
           genericName: storeUpperNull(parsed.data.genericName),
           packSize: parsed.data.packSize ?? 1,
           unit: "UNIT",
@@ -227,7 +237,10 @@ export async function POST(req: Request) {
             : {}),
           ...(parsed.data.gstPct !== undefined ? { gstPct: parsed.data.gstPct } : {}),
         },
-        include: { brand: { select: { id: true, name: true } } },
+        include: {
+          brand: { select: { id: true, name: true } },
+          rack: { select: { id: true, code: true } },
+        },
       });
       return NextResponse.json({ product: p });
     } catch (e) {

@@ -12,6 +12,7 @@ import { StockGstSelect } from "@/app/dashboard/inventory/stock-gst-select";
 import { StockIntField } from "@/app/dashboard/inventory/stock-int-field";
 import { StockProductNameField } from "@/app/dashboard/inventory/stock-product-name-field";
 import { StockScheduleSelect } from "@/app/dashboard/inventory/stock-schedule-select";
+import { StockRackSelect } from "@/app/dashboard/inventory/stock-rack-select";
 import { StockTypeSelect } from "@/app/dashboard/inventory/stock-type-select";
 import { ProductsListMobile } from "./products-list-mobile";
 
@@ -27,6 +28,7 @@ export function ProductsTable({
   products,
   isManager,
   brands,
+  racks,
   pageSize,
   sort,
   dir,
@@ -35,6 +37,7 @@ export function ProductsTable({
   products: ProductListRow[];
   isManager: boolean;
   brands: { id: string; name: string }[];
+  racks: { id: string; code: string }[];
   pageSize: number;
   sort: string;
   dir: string;
@@ -49,18 +52,19 @@ export function ProductsTable({
 
   return (
     <>
-      <ProductsListMobile products={products} isManager={isManager} brands={brands} />
+      <ProductsListMobile products={products} isManager={isManager} brands={brands} racks={racks} />
 
       <div className="hidden overflow-hidden rounded-xl border border-zinc-200 bg-white md:block dark:border-zinc-800 dark:bg-zinc-900">
         <table className="w-full table-fixed text-left text-sm">
           <colgroup>
             <col className="w-[15.5rem]" />
             <col className="w-[6.75rem]" />
-            <col className="w-[12.5rem]" />
+            <col className="w-[12rem]" />
             <col className="w-[5rem]" />
             <col className="w-[4.5rem]" />
             <col className="w-[5.5rem]" />
             <col className="w-[4.75rem]" />
+            <col className="w-[4.5rem]" />
             <col className="w-[9.25rem]" />
             <col className="w-[5rem]" />
             <col className="w-[3rem]" />
@@ -92,6 +96,11 @@ export function ProductsTable({
               </th>
               <th className="px-2 py-3">Type</th>
               <th className="px-2 py-3">Schedule</th>
+              <th className="px-2 py-3">
+                <Link href={sortHref("rack")} className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
+                  Rack {sort === "rack" ? (dir === "asc" ? "↑" : "↓") : "↕"}
+                </Link>
+              </th>
               <th className="px-2 py-3">Supplier</th>
               <th className="px-2 py-3 text-right">
                 <Link href={sortHref("stock")} className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-zinc-700 hover:text-brand-blue-light dark:text-zinc-200">
@@ -117,7 +126,7 @@ export function ProductsTable({
           </thead>
           <tbody>
             {products.map((p) => (
-              <ProductCatalogRow key={p.productId} p={p} isManager={isManager} brands={brands} />
+              <ProductCatalogRow key={p.productId} p={p} isManager={isManager} brands={brands} racks={racks} />
             ))}
           </tbody>
         </table>
@@ -133,10 +142,12 @@ function ProductCatalogRow({
   p,
   isManager,
   brands,
+  racks,
 }: {
   p: ProductListRow;
   isManager: boolean;
   brands: { id: string; name: string }[];
+  racks: { id: string; code: string }[];
 }) {
   const [category, setCategory] = useState(p.productCategory);
   const janaushadhi = category === "JANAUSHADHI";
@@ -198,6 +209,16 @@ function ProductCatalogRow({
         <StockScheduleSelect
           productId={p.productId}
           productSchedule={p.productSchedule}
+          canEdit={isManager}
+          compact
+        />
+      </td>
+      <td className="px-2 py-1.5 align-top">
+        <StockRackSelect
+          productId={p.productId}
+          rackId={p.rackId}
+          rackCode={p.rackCode}
+          racks={racks}
           canEdit={isManager}
           compact
         />

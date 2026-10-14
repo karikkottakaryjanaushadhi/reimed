@@ -88,6 +88,7 @@ export type PurchaseLineDraft = {
   catalogProductCategory?: ProductCategory;
   catalogProductType?: ProductType;
   catalogProductSchedule?: ProductSchedule;
+  catalogRackId?: string | null;
   catalogDrugCode?: string;
   manufacturer?: string;
   genericName?: string;
@@ -232,6 +233,7 @@ export const PurchaseLinesEditor = forwardRef<
     useState<ProductType>(DEFAULT_PRODUCT_TYPE);
   const [addCatalogProductSchedule, setAddCatalogProductSchedule] =
     useState<ProductSchedule>(DEFAULT_PRODUCT_SCHEDULE);
+  const [addCatalogRackId, setAddCatalogRackId] = useState<string | null>(null);
   const [newProductModalOpen, setNewProductModalOpen] = useState(false);
   const [newProductModalInitial, setNewProductModalInitial] =
     useState<PurchaseNewProductModalInitial | null>(null);
@@ -267,6 +269,7 @@ export const PurchaseLinesEditor = forwardRef<
     setAddCatalogProductCategory(DEFAULT_PRODUCT_CATEGORY);
     setAddCatalogProductType(DEFAULT_PRODUCT_TYPE);
     setAddCatalogProductSchedule(DEFAULT_PRODUCT_SCHEDULE);
+    setAddCatalogRackId(null);
   }
 
   function focusAddRowNameSearch() {
@@ -297,6 +300,7 @@ export const PurchaseLinesEditor = forwardRef<
         productCategory: addCatalogProductCategory,
         productType: addCatalogProductType,
         productSchedule: addCatalogProductSchedule,
+        rackId: addCatalogRackId,
         brandId: addCatalogBrandId,
         brandName: addManufacturer,
         drugCode: addDraft.catalogDrugCode ?? "",
@@ -327,6 +331,7 @@ export const PurchaseLinesEditor = forwardRef<
       catalogProductCategory: v.productCategory,
       catalogProductType: v.productType,
       catalogProductSchedule: v.productSchedule,
+      catalogRackId: v.rackId,
       catalogDrugCode:
         v.productCategory === "JANAUSHADHI" && v.drugCode.trim() ? v.drugCode.trim() : undefined,
     });
@@ -337,6 +342,7 @@ export const PurchaseLinesEditor = forwardRef<
     setAddCatalogProductCategory(v.productCategory);
     setAddCatalogProductType(v.productType);
     setAddCatalogProductSchedule(v.productSchedule);
+    setAddCatalogRackId(v.rackId);
     setAddSearchQ("");
     setAddHits([]);
     setAddHitHi(-1);
@@ -609,6 +615,7 @@ export const PurchaseLinesEditor = forwardRef<
                   productCategory: row.catalogProductCategory,
                   productType: row.catalogProductType,
                   productSchedule: row.catalogProductSchedule,
+                  ...(row.catalogRackId ? { rackId: row.catalogRackId } : {}),
                   ...(row.genericName?.trim() ? { genericName: row.genericName.trim() } : {}),
                   ...(row.catalogProductCategory === "JANAUSHADHI" && row.catalogDrugCode?.trim()
                     ? { drugCode: row.catalogDrugCode.trim() }

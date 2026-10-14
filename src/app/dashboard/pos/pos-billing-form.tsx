@@ -62,6 +62,7 @@ type SaleLoadLine = {
   productId: string;
   lotId: string;
   name: string;
+  rack?: string | null;
   packSize: number;
   batchNo: string;
   expiryDate: string;
@@ -212,6 +213,7 @@ export function PosBillingForm({
             productId: l.productId,
             lotId: l.lotId,
             name: l.name,
+            rack: l.rack ?? null,
             batchNo: l.batchNo,
             expiryDate: l.expiryDate.slice(0, 10),
             packSize: l.packSize,
@@ -541,7 +543,14 @@ export function PosBillingForm({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-medium text-zinc-900 dark:text-zinc-50">{l.name}</p>
+                    <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                      {l.name}
+                      {l.rack ? (
+                        <span className="ml-1.5 rounded bg-zinc-200 px-1 py-px align-middle font-mono text-[10px] font-semibold tabular-nums text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100">
+                          {l.rack}
+                        </span>
+                      ) : null}
+                    </p>
                     <p className="mt-1 font-mono text-xs text-zinc-600 dark:text-zinc-400">
                       {l.batchNo} · Exp {formatLotExpiry(l.expiryDate)} · Pack {l.packSize}
                     </p>
@@ -728,10 +737,17 @@ export function PosBillingForm({
                     {i + 1}
                   </td>
                   <td
-                    className="min-w-0 max-w-none truncate px-2 py-2 align-middle text-sm font-medium text-zinc-900 dark:text-zinc-50"
-                    title={l.name}
+                    className="min-w-0 max-w-none px-2 py-2 align-middle text-sm font-medium text-zinc-900 dark:text-zinc-50"
+                    title={[l.name, l.rack].filter(Boolean).join(" · ")}
                   >
-                    {l.name}
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="min-w-0 truncate">{l.name}</span>
+                      {l.rack ? (
+                        <span className="shrink-0 rounded bg-zinc-200 px-1 py-px font-mono text-[10px] font-semibold tabular-nums text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100">
+                          {l.rack}
+                        </span>
+                      ) : null}
+                    </span>
                   </td>
                   <td className="min-w-0 truncate px-1 py-2 align-middle font-mono text-xs text-zinc-700 dark:text-zinc-200">
                     {l.batchNo}

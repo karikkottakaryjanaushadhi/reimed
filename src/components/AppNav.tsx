@@ -69,6 +69,8 @@ const navConfig: (NavLinkDef | NavMenuDef)[] = [
       { href: "/dashboard/products/new", label: "Add product" },
       { href: "/dashboard/brands", label: "Brands" },
       { href: "/dashboard/brands/new", label: "Add brand" },
+      { href: "/dashboard/racks", label: "Racks" },
+      { href: "/dashboard/racks/new", label: "Add rack" },
       { href: "/dashboard/suppliers", label: "Suppliers" },
       { href: "/dashboard/suppliers/new", label: "Add supplier" },
     ],

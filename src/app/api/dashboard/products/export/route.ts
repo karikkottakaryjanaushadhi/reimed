@@ -9,6 +9,7 @@ import { productScheduleLabel } from "@/lib/product-schedules";
 import { parseProductStockFilter, queryProductList } from "@/lib/products-list-query";
 import {
   parseProductCategoryFilter,
+  parseProductRackFilter,
   parseProductScheduleFilter,
   parseProductTypeFilter,
 } from "@/lib/products-filter-options";
@@ -26,6 +27,7 @@ export async function GET(req: Request) {
     category: parseProductCategoryFilter(searchParams.get("category")),
     type: parseProductTypeFilter(searchParams.get("type")),
     schedule: parseProductScheduleFilter(searchParams.get("schedule")),
+    rack: parseProductRackFilter(searchParams.get("rack")),
     gst: searchParams.get("gst") ?? undefined,
     stock: parseProductStockFilter(searchParams.get("stock")),
     sort: searchParams.get("sort") ?? undefined,
@@ -42,6 +44,7 @@ export async function GET(req: Request) {
       "Category",
       "Type",
       "Schedule",
+      "Rack",
       "Supplier",
       "Stock",
       "Pack",
@@ -58,6 +61,7 @@ export async function GET(req: Request) {
       row.productSchedule && row.productSchedule !== "NONE"
         ? productScheduleLabel(row.productSchedule)
         : "",
+      row.rackCode ?? "",
       row.suppliers ?? "",
       row.stockQty,
       row.packSize,

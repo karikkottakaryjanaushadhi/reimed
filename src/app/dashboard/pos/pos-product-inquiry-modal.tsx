@@ -241,6 +241,7 @@ export function PosProductInquiryModal({
                 <InquiryFact label="Type" value={productTypeLabel(p.productType)} />
                 <InquiryFact label="Category" value={productCategoryLabel(p.productCategory)} />
                 <InquiryFact label="Schedule" value={productScheduleLabel(p.productSchedule)} />
+                <InquiryFact label="Rack" value={p.rack ?? ""} />
                 <InquiryFact label="GST" value={`${p.gstPct}%`} />
                 <InquiryFact label="Pack" value={String(p.packSize)} />
                 <InquiryFact label="HSN" value={p.hsn ?? ""} />

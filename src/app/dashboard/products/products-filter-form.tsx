@@ -12,7 +12,7 @@ import type { ProductStockFilter } from "@/lib/products-filter-options";
 
 export type { ProductStockFilter };
 
-const FILTER_FIELDS = ["q", "brand", "supplier", "category", "type", "schedule", "gst", "stock"] as const;
+const FILTER_FIELDS = ["q", "brand", "supplier", "category", "type", "schedule", "rack", "gst", "stock"] as const;
 
 const fieldCls =
   "rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-brand-blue-light dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100";
@@ -24,6 +24,8 @@ export function ProductsFilterForm({
   category,
   type,
   schedule,
+  rack,
+  racks,
   gst,
   stock,
   initialBrands,
@@ -40,6 +42,8 @@ export function ProductsFilterForm({
   category: string;
   type: string;
   schedule: string;
+  rack: string;
+  racks: { id: string; code: string }[];
   gst: string;
   stock: ProductStockFilter;
   initialBrands: string[];
@@ -81,7 +85,7 @@ export function ProductsFilterForm({
           type="search"
           defaultValue={q}
           onChange={refresh}
-          placeholder="Name, drug code, brand or generic…"
+          placeholder="Name, drug code, brand, generic or rack…"
           autoComplete="off"
           className={fieldCls}
         />
@@ -144,6 +148,18 @@ export function ProductsFilterForm({
           {PRODUCT_SCHEDULES.map((s) => (
             <option key={s} value={s}>
               {PRODUCT_SCHEDULE_LABELS[s]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Rack</span>
+        <select name="rack" defaultValue={rack} onChange={refresh} className={fieldCls} aria-label="Rack">
+          <option value="">All</option>
+          {racks.map((r) => (
+            <option key={r.id} value={r.code}>
+              {r.code}
             </option>
           ))}
         </select>

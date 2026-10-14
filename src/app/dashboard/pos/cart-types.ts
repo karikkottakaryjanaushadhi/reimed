@@ -16,13 +16,15 @@ export type Lot = {
   expired?: boolean;
   /** Units per pack for this batch (billing). */
   packSize: number;
-  product: { id: string; name: string; packSize: number; gstPct: number };
+  product: { id: string; name: string; packSize: number; gstPct: number; rack?: string | null };
 };
 
 export type CartLine = {
   productId: string;
   lotId: string;
   name: string;
+  /** Shelf code from the product master. */
+  rack?: string | null;
   batchNo: string;
   expiryDate: string;
   packSize: number;

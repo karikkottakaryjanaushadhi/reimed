@@ -48,6 +48,7 @@ type StockRow = {
   name: string;
   genericName?: string | null;
   brand?: string | null;
+  rack?: string | null;
   supplier?: string | null;
   mrpMin: number | null;
   mrpMax: number | null;
@@ -503,6 +504,7 @@ export function useDraftLine({
       productId: lot.product.id,
       lotId: lot.id,
       name: lot.product.name,
+      rack: lot.product.rack ?? null,
       batchNo: lot.batchNo,
       expiryDate: lot.expiryDate.slice(0, 10),
       packSize: lotBillingPackSize(lot),
@@ -816,7 +818,14 @@ function StockPickerList({
             onClick={() => void draft.pickProduct(p.productId)}
           >
             <span className="min-w-0 flex-1">
-              <span className="block break-words font-medium text-zinc-900 dark:text-zinc-100">{p.name}</span>
+              <span className="flex min-w-0 items-baseline gap-1.5">
+                <span className="min-w-0 break-words font-medium text-zinc-900 dark:text-zinc-100">{p.name}</span>
+                {p.rack ? (
+                  <span className="shrink-0 rounded bg-zinc-200 px-1 py-px font-mono text-[10px] font-semibold tabular-nums text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100">
+                    {p.rack}
+                  </span>
+                ) : null}
+              </span>
               {p.genericName ? (
                 <span className="mt-0.5 block truncate text-[10px] text-zinc-500 dark:text-zinc-400" title={p.genericName}>
                   {p.genericName}

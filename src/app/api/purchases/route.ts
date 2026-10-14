@@ -10,6 +10,7 @@ import { isProductGstSlab, snapProductGstPct } from "@/lib/product-gst-slabs";
 import { isProductCategory } from "@/lib/product-categories";
 import { isProductType } from "@/lib/product-types";
 import { isProductSchedule } from "@/lib/product-schedules";
+import { findExistingRackId } from "@/lib/product-racks";
 import { normalizeInventoryLotExpiryDate } from "@/lib/inventory-lot-expiry";
 import { lotSalePricingFromPurchaseLine } from "@/lib/inventory-lot-pricing";
 import { upsertInventoryLotStockFromPurchase } from "@/lib/inventory-lot-upsert";
@@ -54,6 +55,7 @@ const newProductSchema = z.object({
     .string()
     .refine((v) => isProductSchedule(v), { message: "Invalid product schedule" })
     .optional(),
+  rackId: z.string().min(1).optional(),
   gstPct: z.number().refine((n) => isProductGstSlab(n), { message: "GST % must be 0, 5, 18, or 40" }).optional(),
   drugCode: z.string().optional(),
 }).superRefine((val, ctx) => {
@@ -192,6 +194,12 @@ export async function POST(req: Request) {
           if (!brandId && np.brand?.trim()) {
             brandId = await resolveBrandId(tx, np.brand);
           }
+          let rackId: string | undefined;
+          if (np.rackId) {
+            const found = await findExistingRackId(tx, np.rackId);
+            if (!found) throw new Error("Unknown rack");
+            rackId = found;
+          }
           const { sku: initialSku, explicit: explicitSku } = resolveProductSkuFromDrugCode(
             drugCodeFromUserInput(np.drugCode, np.productCategory),
             np.productCategory,
@@ -212,6 +220,7 @@ export async function POST(req: Request) {
                   ...(np.productCategory !== undefined ? { productCategory: np.productCategory } : {}),
                   ...(np.productType !== undefined ? { productType: np.productType } : {}),
                   ...(np.productSchedule !== undefined ? { productSchedule: np.productSchedule } : {}),
+                  ...(rackId ? { rackId } : {}),
                   ...(np.gstPct !== undefined ? { gstPct: np.gstPct } : {}),
                 },
               });

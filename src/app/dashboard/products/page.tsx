@@ -6,6 +6,7 @@ import { ProductsTable } from "@/app/dashboard/products/products-table";
 import { MobileFilterSheet } from "@/components/mobile-filter-sheet";
 import { getAuthContext, isManager } from "@/lib/auth-context";
 import { getBrandOptions } from "@/lib/brand-options";
+import { getRackOptions } from "@/lib/rack-options";
 import { isProductGstSlab } from "@/lib/product-gst-slabs";
 import {
   DEFAULT_LIST_PAGE_SIZE,
@@ -16,6 +17,7 @@ import {
 import {
   getProductFilterOptions,
   parseProductCategoryFilter,
+  parseProductRackFilter,
   parseProductScheduleFilter,
   parseProductTypeFilter,
 } from "@/lib/products-filter-options";
@@ -34,6 +36,7 @@ function productListExtras(
   category: string,
   type: string,
   schedule: string,
+  rack: string,
   gst: string,
   stock: ProductStockFilter,
   pageSize: number,
@@ -47,6 +50,7 @@ function productListExtras(
   if (category) e.category = category;
   if (type) e.type = type;
   if (schedule) e.schedule = schedule;
+  if (rack) e.rack = rack;
   if (gst) e.gst = gst;
   if (stock) e.stock = stock;
   if (pageSize !== DEFAULT_LIST_PAGE_SIZE) e.limit = String(pageSize);
@@ -67,6 +71,7 @@ export default async function ProductsPage({
     category?: string;
     type?: string;
     schedule?: string;
+    rack?: string;
     gst?: string;
     stock?: string;
     sort?: string;
@@ -83,6 +88,7 @@ export default async function ProductsPage({
   const category = parseProductCategoryFilter(sp.category);
   const type = parseProductTypeFilter(sp.type);
   const schedule = parseProductScheduleFilter(sp.schedule);
+  const rack = parseProductRackFilter(sp.rack);
   const gstRaw = String(sp.gst ?? "").trim();
   const gst = gstRaw && isProductGstSlab(Number(gstRaw)) ? gstRaw : "";
   const stock = parseProductStockFilter(sp.stock);
@@ -91,12 +97,13 @@ export default async function ProductsPage({
   const rawPage = Math.max(1, parseInt(String(sp.page ?? "1"), 10) || 1);
   const pageSizeRequested = parseListLimitParam(sp.limit);
   const storeId = ctx.activeStoreId;
-  const listParams = { storeId, q, brand, supplier, category, type, schedule, gst, stock, sort, dir };
+  const listParams = { storeId, q, brand, supplier, category, type, schedule, rack, gst, stock, sort, dir };
 
   const skipGuess = (rawPage - 1) * pageSizeRequested;
-  const [filterOptions, catalogBrands, totalCount, productsGuess] = await Promise.all([
-    getProductFilterOptions({ storeId, q, brand, supplier, category, type, schedule, gst, stock }),
+  const [filterOptions, catalogBrands, catalogRacks, totalCount, productsGuess] = await Promise.all([
+    getProductFilterOptions({ storeId, q, brand, supplier, category, type, schedule, rack, gst, stock }),
     getBrandOptions(),
+    getRackOptions(),
     countProductList(listParams),
     queryProductList({
       ...listParams,
@@ -117,7 +124,7 @@ export default async function ProductsPage({
           offset: skip,
         });
 
-  const extras = productListExtras(q, brand, supplier, category, type, schedule, gst, stock, pageSize, sort, dir);
+  const extras = productListExtras(q, brand, supplier, category, type, schedule, rack, gst, stock, pageSize, sort, dir);
   const exportHref = buildSimpleListUrl("/api/dashboard/products/export", 1, DEFAULT_LIST_PAGE_SIZE, {
     ...(q ? { q } : {}),
     ...(brand ? { brand } : {}),
@@ -125,6 +132,7 @@ export default async function ProductsPage({
     ...(category ? { category } : {}),
     ...(type ? { type } : {}),
     ...(schedule ? { schedule } : {}),
+    ...(rack ? { rack } : {}),
     ...(gst ? { gst } : {}),
     ...(stock ? { stock } : {}),
     ...(sort !== "name" ? { sort } : {}),
@@ -135,7 +143,7 @@ export default async function ProductsPage({
     ...(sort !== "name" ? { sort } : {}),
     ...(dir !== "asc" ? { dir } : {}),
   });
-  const hasFilters = !!(q || brand || supplier || category || type || schedule || gst || stock);
+  const hasFilters = !!(q || brand || supplier || category || type || schedule || rack || gst || stock);
   let activeFilterCount = 0;
   if (q) activeFilterCount += 1;
   if (brand) activeFilterCount += 1;
@@ -143,6 +151,7 @@ export default async function ProductsPage({
   if (category) activeFilterCount += 1;
   if (type) activeFilterCount += 1;
   if (schedule) activeFilterCount += 1;
+  if (rack) activeFilterCount += 1;
   if (gst) activeFilterCount += 1;
   if (stock) activeFilterCount += 1;
 
@@ -172,6 +181,8 @@ export default async function ProductsPage({
           category={category}
           type={type}
           schedule={schedule}
+          rack={rack}
+          racks={catalogRacks}
           gst={gst}
           stock={stock}
           initialBrands={filterOptions.brands}
@@ -195,6 +206,7 @@ export default async function ProductsPage({
         products={products}
         isManager={isManager(ctx)}
         brands={catalogBrands}
+        racks={catalogRacks}
         pageSize={pageSize}
         sort={sort}
         dir={dir}

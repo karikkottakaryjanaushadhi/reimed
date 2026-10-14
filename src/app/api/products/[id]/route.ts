@@ -14,11 +14,13 @@ import { isProductGstSlab } from "@/lib/product-gst-slabs";
 import { isProductCategory } from "@/lib/product-categories";
 import { isProductType } from "@/lib/product-types";
 import { isProductSchedule } from "@/lib/product-schedules";
+import { findExistingRackId } from "@/lib/product-racks";
 
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
   drugCode: z.string().optional(),
   brandId: z.union([z.string().min(1), z.null()]).optional(),
+  rackId: z.union([z.string().min(1), z.null()]).optional(),
   genericName: z.string().optional(),
   packSize: z.number().int().min(1).optional(),
   hsn: z.string().optional(),
@@ -68,6 +70,16 @@ export async function PATCH(
     nextDrugCode = drugCodeFromUserInput(parsed.data.drugCode, category);
   }
 
+  let nextRackId: string | null | undefined;
+  if (parsed.data.rackId !== undefined) {
+    if (parsed.data.rackId == null) {
+      nextRackId = null;
+    } else {
+      nextRackId = await findExistingRackId(prisma, parsed.data.rackId);
+      if (!nextRackId) return NextResponse.json({ error: "Unknown rack" }, { status: 400 });
+    }
+  }
+
   if (parsed.data.name != null) {
     try {
       await assertProductNameAvailable(prisma, parsed.data.name, id);
@@ -89,6 +101,7 @@ export async function PATCH(
       ...(parsed.data.hsn != null ? { hsn: storeUpperNull(parsed.data.hsn) } : {}),
       ...(parsed.data.reorderMin != null ? { reorderMin: parsed.data.reorderMin } : {}),
       ...(parsed.data.brandId !== undefined ? { brandId: parsed.data.brandId } : {}),
+      ...(nextRackId !== undefined ? { rackId: nextRackId } : {}),
       ...(parsed.data.genericName !== undefined
         ? { genericName: storeUpperNull(parsed.data.genericName) }
         : {}),
@@ -103,7 +116,10 @@ export async function PATCH(
         : {}),
       ...(parsed.data.gstPct !== undefined ? { gstPct: parsed.data.gstPct } : {}),
     },
-    include: { brand: { select: { id: true, name: true } } },
+    include: {
+      brand: { select: { id: true, name: true } },
+      rack: { select: { id: true, code: true } },
+    },
   });
     return NextResponse.json({ product });
   } catch (e) {

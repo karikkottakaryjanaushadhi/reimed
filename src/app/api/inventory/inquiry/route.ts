@@ -36,6 +36,7 @@ export async function GET(req: Request) {
           reorderMin: true,
           unit: true,
           brand: { select: { name: true } },
+          rack: { select: { code: true } },
           lots: {
             where: { storeId: ctx.activeStoreId },
             select: {
@@ -72,6 +73,7 @@ export async function GET(req: Request) {
           productCategory: product.productCategory,
           productType: product.productType,
           productSchedule: product.productSchedule,
+          rack: product.rack?.code ?? null,
           reorderMin: product.reorderMin,
           unit: product.unit,
         },

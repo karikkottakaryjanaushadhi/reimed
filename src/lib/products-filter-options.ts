@@ -4,6 +4,7 @@ import { isProductCategory } from "@/lib/product-categories";
 import { isProductGstSlab } from "@/lib/product-gst-slabs";
 import { isProductSchedule } from "@/lib/product-schedules";
 import { isProductType } from "@/lib/product-types";
+import { normalizeRackCode } from "@/lib/product-racks";
 import { prisma } from "@/lib/prisma";
 import { withServerTimedCache } from "@/lib/server-timed-cache";
 
@@ -18,6 +19,7 @@ export type ProductFilterParams = {
   category?: string;
   type?: string;
   schedule?: string;
+  rack?: string;
   supplier?: string;
 };
 
@@ -36,6 +38,10 @@ export function parseProductScheduleFilter(raw: unknown): string {
   return isProductSchedule(v) ? v : "";
 }
 
+export function parseProductRackFilter(raw: unknown): string {
+  return normalizeRackCode(String(raw ?? ""));
+}
+
 export function productCatalogWhereParts(
   params: ProductFilterParams,
   omit?: "brand" | "supplier",
@@ -47,6 +53,7 @@ export function productCatalogWhereParts(
   const category = parseProductCategoryFilter(params.category);
   const type = parseProductTypeFilter(params.type);
   const schedule = parseProductScheduleFilter(params.schedule);
+  const rack = parseProductRackFilter(params.rack);
   const supplier = omit === "supplier" ? "" : (params.supplier?.trim() ?? "");
 
   const qPat = q ? `%${q}%` : null;
@@ -64,6 +71,7 @@ export function productCatalogWhereParts(
         ${skuClause}
         OR p."genericName" ILIKE ${qPat}
         OR b."name" ILIKE ${qPat}
+        OR r."code" ILIKE ${qPat}
       )`,
     );
   }
@@ -81,6 +89,9 @@ export function productCatalogWhereParts(
   }
   if (schedule) {
     whereParts.push(Prisma.sql`p."productSchedule" = ${schedule}`);
+  }
+  if (rack) {
+    whereParts.push(Prisma.sql`r."code" = ${rack}`);
   }
   if (supplierPat) {
     whereParts.push(Prisma.sql`s."name" ILIKE ${supplierPat}`);
@@ -118,6 +129,7 @@ function filterCacheKey(params: ProductFilterParams) {
     category: parseProductCategoryFilter(params.category),
     type: parseProductTypeFilter(params.type),
     schedule: parseProductScheduleFilter(params.schedule),
+    rack: parseProductRackFilter(params.rack),
     supplier: params.supplier?.trim() ?? "",
   };
 }
@@ -141,6 +153,7 @@ export async function getProductFilterOptions(
           SELECT DISTINCT b."name" AS "name"
           FROM "Product" p
           INNER JOIN "Brand" b ON b."id" = p."brandId"
+          LEFT JOIN "Rack" r ON r."id" = p."rackId"
           ${lotJoin}
           ${supplierJoin}
           WHERE ${brandWhere}
@@ -152,6 +165,7 @@ export async function getProductFilterOptions(
           SELECT DISTINCT b."name" AS "name"
           FROM "Product" p
           INNER JOIN "Brand" b ON b."id" = p."brandId"
+          LEFT JOIN "Rack" r ON r."id" = p."rackId"
           WHERE ${brandWhere}
           ORDER BY b."name" ASC
         `;
@@ -161,6 +175,7 @@ export async function getProductFilterOptions(
           SELECT DISTINCT s."name" AS "name"
           FROM "Product" p
           LEFT JOIN "Brand" b ON b."id" = p."brandId"
+          LEFT JOIN "Rack" r ON r."id" = p."rackId"
           INNER JOIN "InventoryLot" il ON il."productId" = p."id" AND il."storeId" = ${storeId}
           INNER JOIN "Supplier" s ON s."id" = il."supplierId"
           WHERE ${supplierWhere}
@@ -172,6 +187,7 @@ export async function getProductFilterOptions(
           SELECT DISTINCT s."name" AS "name"
           FROM "Product" p
           LEFT JOIN "Brand" b ON b."id" = p."brandId"
+          LEFT JOIN "Rack" r ON r."id" = p."rackId"
           INNER JOIN "InventoryLot" il ON il."productId" = p."id" AND il."storeId" = ${storeId}
           INNER JOIN "Supplier" s ON s."id" = il."supplierId"
           WHERE ${supplierWhere}
