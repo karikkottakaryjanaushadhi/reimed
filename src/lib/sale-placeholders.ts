@@ -1,25 +1,31 @@
 /** Used when POS leaves customer/doctor blank — still stored for lists & receipts */
 
 const CUSTOMERS = [
-  "WALK-IN CUSTOMER",
-  "RETAIL SALE",
-  "COUNTER CUSTOMER",
-  "GENERAL BUYER",
-  "OPD WALK-IN",
-  "CASH CUSTOMER",
-  "OPEN SALE",
-  "UNREGISTERED BUYER",
+  "AMAL",
+  "MINI",
+  "THOMAS",
+  "JOSEPH",
+  "FATHIMA",
+  "MOHAMMED",
+  "TOMY",
+  "ROHITH",
+  "RAJU",
+  "JACOB",
+  "VISHNU",
+  "RADHA",
 ];
 
 const DOCTORS = [
-  "DR. A. SHARMA",
-  "DR. MEERA NAIR",
-  "DR. VIKRAM PATEL",
-  "DR. S. IYER",
-  "DR. ANANYA BOSE",
-  "DR. R. KHAN",
+  "DR. PHC",
+  "DR. JOSE ANTONY",
+  "DR. DEEPAK RAJU",
+  "DR. REVATHI",
+  "DR. MOHAN KUMAR",
+  "DR. ASHRAF P",
   "DR. PRIYA MENON",
-  "GENERAL PHYSICIAN",
+  "DR. MANU MATHEW",
+  "DR. LALY D.C",
+  "DR. SABU KG",
 ];
 
 export function randomPlaceholderCustomerName(): string {
